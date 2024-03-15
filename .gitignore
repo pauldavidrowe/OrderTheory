@@ -1,0 +1,7 @@
+*.olean
+/_target
+/.lake
+/doc-gen
+/build
+/lake-packages
+/leanpkg.path
