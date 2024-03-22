@@ -1,4 +1,8 @@
 import OrderTheory.Mathlib.lib
+import Mathlib.Order.Cover
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Order.Minimal
+
 
 open scoped Classical
 /-!
@@ -67,9 +71,19 @@ open scoped Classical
   The fact that a subset of a chain is also a chain is written using `IsChain.mono`. The
   corresponding fact about antichains is written as `IsAntichain.subset`.
 
-  TODO: Consider defining `Fin' n` as a type synonym for `Fin n` with an instance
-  of `PartialOrder` that turns it into an antichain.
+  We can define `Fin' n` to be the type of finite antichains. That is, the type
+  has n elements, and they are only related to each other via `=`.
 -/
+
+def Fin' (n : ℕ) := Fin n
+
+instance Fin'.instPartialOrder {n : Nat} : PartialOrder (Fin' n) :=
+  {
+    le := (· = ·)
+    le_refl := Eq.refl
+    le_trans := λ a b c ↦ Eq.trans
+    le_antisymm := λ a b h1 _ ↦ h1
+  }
 
 /-!
   ## 1.4 Order Isomorphisms
@@ -77,8 +91,11 @@ open scoped Classical
   The definition used in the text book is importantly different from the one used
   in Lean. The textbook definition of an isomorphism between Partial Orders P and Q
   is a function `φ : P → Q` such that
-    - (i) `φ` is surjective and
-    - (ii) `x ≤ y` if and only if `φ x ≤ φ y`
+
+    * (i) `φ` is surjective and
+
+    * (ii) `x ≤ y` if and only if `φ x ≤ φ y`.
+
   We include a formalization of this definition in case it makes sense to use it
   when proving two orders are isomorphic.
 -/
@@ -88,26 +105,29 @@ class OrderIso' (P Q : Type*) [PartialOrder P] [PartialOrder Q] where
   surjective : Function.Surjective toFun
   map_rel_iff' : ∀ {a b}, toFun a ≤ toFun b ↔ a ≤ b
 
+/-- We use `P ≃o' Q` to denote the type of `OrderIso'` between `P` and `Q`.-/
+infix:100 " ≃o' " => OrderIso'
+
 /-!
-  Lean's definition of OrderIso requires an explicit inverse `invFun : Q → P` to be
+  Lean's definition of `OrderIso` requires an explicit inverse `invFun : Q → P` to be
   provided along with proofs that `invFun` forms both a left and right inverse of `toFun`.
   This style is inherently more constructive than the textbook version which is why
   it is preferred in Lean. The Lean definition is also more general in the sense that
-  it does not assume P and Q are Partial Orders, only that they have `≤` defined.
+  it does not assume P and Q are partial orders, only that they have `≤` defined.
 
-  If we have an OrderIso', we can create an OrderIso, but that translation is not computable,
-  because the inverse of an arbitrary OrderIso' is obtained by instantiating an existential.
-  Nonetheless, we can do it. The next two lemmas are useful for this purpose but are
-  not in Mathlib.
+  If we have an `OrderIso'`, we can create an `OrderIso`, but that translation is not
+  computable, because the inverse of an arbitrary `OrderIso'` is obtained by instantiating
+  an existential. Nonetheless, we can do it. The next two lemmas are useful for this purpose
+  but are not in Mathlib.
 -/
 
 /-- In a partial order, the converse of anti-symmetry also holds. -/
-lemma le_le_iff_eq [inst : PartialOrder P] {a b : P} : a ≤ b ∧ b ≤ a ↔ a = b := by
+lemma le_le_iff_eq [PartialOrder P] {a b : P} : a ≤ b ∧ b ≤ a ↔ a = b := by
   constructor
   · rintro ⟨h1, h2⟩
-    exact inst.le_antisymm a b h1 h2
+    exact PartialOrder.le_antisymm a b h1 h2
   · intro eq
-    use le_of_eq eq
+    apply And.intro (le_of_eq eq)
     exact le_of_eq eq.symm
 
 /--
@@ -124,7 +144,7 @@ lemma injective_of_le_iff_le [PartialOrder P] [PartialOrder Q]
 /--
   Given an OrderIso', we can define (though not compute) an OrderIso.
 -/
-noncomputable def OrderIsoOfBookOrderIso [PartialOrder P] [PartialOrder Q]
+noncomputable def OrderIsoOfOrderIso' [PartialOrder P] [PartialOrder Q]
     (φ : OrderIso' P Q) : OrderIso P Q := by
   have h : Function.Bijective φ.toFun :=
         ⟨injective_of_le_iff_le φ.map_rel_iff', φ.surjective⟩
@@ -138,10 +158,10 @@ noncomputable def OrderIsoOfBookOrderIso [PartialOrder P] [PartialOrder Q]
   }
 
 /-!
-  For the most part we will work with Lean's OrderIso, but we may prefer OrderIso'
+  For the most part we will work with Lean's `OrderIso`, but we may prefer `OrderIso'`
   in cases where we want to mimic a proof found in the textbook.
 
-  The inverse of an OrderIso φ is denoted `φ.symm`. This is a full OrderIso
+  The inverse of an `OrderIso`, `φ`, is denoted `φ.symm`. This is a full `OrderIso`
   structure that comes equipped with all the necessary proofs that it is also
   an order isomorphism.
 -/
@@ -154,8 +174,9 @@ noncomputable def OrderIsoOfBookOrderIso [PartialOrder P] [PartialOrder Q]
   the textbook defines ℕ as excluding 0 and writes ℕ₀ to denote the natural numbers
   with 0. In Lean, ℕ includes 0, so we will do the same.
 
-  We can define a partial order on ℕ as `m ≤ n` if and only if `m ∣ n`. Since this
-  is not the default order on ℕ in Lean, we show how to define it here.
+  We can define a different partial order on ℕ as `m ≤ n` if and only if `m` divides `n`,
+  (written `m ∣ n`). Since this is not the default order on ℕ in Lean, we show how to
+  define it here.
 -/
 
 def instNatDivPartialOrder : PartialOrder ℕ :=
@@ -174,8 +195,8 @@ def instNatDivPartialOrder : PartialOrder ℕ :=
   type P forms a partial order where `≤` is interpreted as `⊆`. Lean already has
   a `PartialOrder` instance for `Set P`. Beyond considering all subsets of P, we
   often consider a restricted class of subsets of P. A particularly important
-  class in order theory is the down-sets of P. The textbook denotes this as `O(P)`
-  using a script O. We will see in 1.27 below how they are represented in Lean.
+  class in order theory is the down-sets of P. The textbook denotes this as `𝒪(P)`.
+  We will see in 1.27 below how they are represented in Lean.
 
   The textbook talks about the predicates p on a type P: `p : P → Prop`. There is
   a natural correspondence between such predicates p and subsets `S : Set P`. In
@@ -194,7 +215,7 @@ def instNatDivPartialOrder : PartialOrder ℕ :=
 
   Intervals form a strict partial order according the rule `[a, b] < [c, d]` if
   and only if `b < c` in the usual sence. Lean has defined `Interval X` to be
-  the type of (closed) intervals of X (assuming ≤ is defined on X). It then also
+  the type of (closed) intervals of `X` (assuming `≤` is defined on `X`). It then also
   has a default instance showing that `Interval X` forms a partial order.
 
   The book mentions concept analysis as a use case for partial orders. We delay
@@ -216,10 +237,10 @@ def instNatDivPartialOrder : PartialOrder ℕ :=
   ## 1.9 Binary Strings
 
   Binary strings are finite lists of 0s and 1s. We can represent the type of finite
-  binary strings in Lean as `List (Fin 2)`. Here, `List` is the type of (finite)
-  lists of some type. We take lists over `Fin 2` which is the finite type of naturals
+  binary strings in Lean as `List (Fin 2)`. Here, `List α` is the type of (finite)
+  lists of some type α. We take lists over `Fin 2` which is the finite type of naturals
   less than 2, (i.e., 0 and 1). We can generalize over arbitrary types, α, not just
-  Fin 2, of course. Finite lists form a partial order according to
+  `Fin 2`, of course. Finite lists form a partial order according to
   `x ≤ y` if and only if `x` is a prefix of `y`. The prefix relation is denoted
   `x <+: y`. This does not appear to be a default instance in Lean, so we define
   it here. It seems that Lean already knows the prefix relation is transitive, so
@@ -252,9 +273,10 @@ instance List.instListPartialOrder {α : Type} : PartialOrder (List α) :=
   lists are somewhat easier as we can represent them as functions `l : ℕ → α`.
   This is the underlying implementation in Lean of `Stream'`. However, possibly
   infinite lists are an important type for order theory because they are often
-  used to represent the output of computations.
+  used to represent the output of computations, some of which terminate (finite
+  lists), and some of which do not (infinite lists).
 
-  TODO: Figure out how to work with streams and define a PartialOrder instance
+  TODO: Figure out how to work with streams and define a `PartialOrder` instance
   on streams.
 -/
 
@@ -264,8 +286,11 @@ instance List.instListPartialOrder {α : Type} : PartialOrder (List α) :=
   A partial map `f : X → Y` is a map that may not be defined on all terms in X.
   In Lean, this is naturally represented by the type `X → Option Y`. For two such
   functions `f` and `g`, we define `f ≤ g` if and only if
+
   (i) `g x` is defined whenever `f x` is, and
+
   (ii) `g x = f x` whenever `f x` is defined.
+
   We start by formalizing `≤`, then showing it is reflexive, transitive, and
   antisymmetric.
 -/
@@ -320,7 +345,7 @@ instance Function.Option.instPartialOrder {X : Type u} {Y : Type v} :
   and bottom of the interval. The top and bottom can each be (independently) closed, open, or
   infinite (unbounded). Such sets are denoted in Lean by the types
   `Set.Icc` `Set.Ico` `Set.Ici` `Set.Ioc` `Set.Ioo` `Set.Ioi` `Set.Iic` `Set.Iio`.
-  (We don't use `Set.Iii` because that's just `Set.univ`, the entire set of values.)
+  (We don't use `Set.Iii` because that's just `Set.univ`, the set of all values of a type.)
 -/
 
 /-!
@@ -338,7 +363,7 @@ instance Function.Option.instPartialOrder {X : Type u} {Y : Type v} :
   ## 1.13 Semantics and semantic domains
 
   There is not much to add for a formalization from this section. Rather there are
-  several forward references to Domains and Domain Theory and the theory of Fixedpoints.
+  several forward references to Domains and Domain Theory and the theory of Fixpoints.
 -/
 
 /-!
@@ -363,9 +388,9 @@ instance Function.Option.instPartialOrder {X : Type u} {Y : Type v} :
 
   The text also mentions in passing that, for finite orders, `x < y` if and only if
   there is a finite sequence of covering relations `x = x₀ ⋖ x₁ ⋖ ... ⋖ xₙ = y`.
-  Dealing with finite sets is surprisingly hard in Lean! While this observation
-  may seem obvious, it is somewhat difficult to formally prove. Since it's
-  used later, it's worth stating it here and leaving it unsolved.
+  While this observation may seem obvious, it is somewhat difficult to formally prove.
+  Dealing with finite sets is surprisingly hard in Lean! Since it's used later, it's
+  worth stating it here and leaving it unsolved.
 
   TODO: Prove the finite chain condition.
 -/
@@ -398,7 +423,7 @@ lemma covChain_of_fintype [PartialOrder P] [Fintype P] {x y : P} :
   This section is all about examples of diagrams. There is not much to formalize.
 -/
 
-/-
+/-!
   ## 1.17 Lemma
 
   Let P and Q be finite ordered sets and let f : P → Q be a bijective map.
@@ -511,7 +536,7 @@ lemma orderIso_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P] [P
   Two ordered sets P and Q are order isomorphic if and only if they can be
   represented by the same diagram.
 
-  Statement and proof omitted.
+  Formalized statement and proof omitted.
 -/
 
 /-!
@@ -526,16 +551,27 @@ lemma orderIso_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P] [P
   `P` and `Pᵒᵈ` are related:
 -/
 
-example [PartialOrder P] (x y : P) : OrderDual.toDual x ≤ OrderDual.toDual y ↔ y ≤ x := by simp
+lemma example_1_19a [PartialOrder P] (x y : P) :
+    OrderDual.toDual x ≤ OrderDual.toDual y ↔ y ≤ x := by simp
 
 /-!
-  The need to write `OrderDual.toDual` is rather annoying. It would be nice to be able
-  to annotate a term with a hat or something and define the notation to take an element
-  to it's order dual.
+  In the current formalization, given `x : P` we will use `xᵈ` to represent
+  `x` viewed as an element of the dual order. Note that `x : Pᵒᵈ` does not perform the
+  same task because there is no coersion from `P` to `pᵒᵈ`. I suspect there is good
+  reason not want to a coersion, but I wonder...
 
+  In any case, we can thus rewrite the above example more compactly.
+-/
+
+postfix:100 "ᵈ" => OrderDual.toDual
+
+lemma example_1_19b [PartialOrder P] (x y : P) :
+    xᵈ ≤ yᵈ ↔ y ≤ x := by simp
+
+/-!
   The importance of duals lies in the duality principle. For any statement Φ, we can
   define a dual statement Φᵒᵈ that replaces every occurrence of ≤ with ≥. Then for
-  any statement Φ, if it's true in all ordered sets, then so is it's dual statement
+  any statement Φ, if it's true in all ordered sets, then so is its dual statement
   Φᵒᵈ. This is surprisingly hard to formalize in a useful way here, because suddenly the
   statements are not just the language we use to express properties, but they become
   objects of study themselves. That is, we would need to define a type of statements.
@@ -566,16 +602,16 @@ example [PartialOrder P] (x y : P) : OrderDual.toDual x ≤ OrderDual.toDual y �
   set by `Set.univ : Set X`.
 -/
 
-example {X : Type u} : (⊥ : Set X) = ∅ := Set.bot_eq_empty
+lemma example_1_20a {X : Type u} : (⊥ : Set X) = ∅ := Set.bot_eq_empty
 
-example {X : Type u} : (⊤ : Set X) = Set.univ := Set.top_eq_univ
+lemma example_1_20b {X : Type u} : (⊤ : Set X) = Set.univ := Set.top_eq_univ
 
 /-!
   ℕ has a bottom element, namely 0, but it has no top element. ℤ has no
   bottom or top element.
 -/
 
-example : ⊥ = 0 := bot_eq_zero
+lemma example_1_20c : ⊥ = 0 := bot_eq_zero
 
 /-!
   The order of finite lists has a bottom element, namely the empty list.
@@ -618,16 +654,21 @@ instance Function.Option.instOrderBot : OrderBot (X → Option Y) :=
   easily implies the first definition by antisymmetry. We write `IsMax x` to
   state that x is a maximal element of P.
 
-  The text talks of maximal elements of `Q : Set P`, and used the notation MaxQ
+  The text talks of maximal elements of `Q : Set P`, and uses the notation MaxQ
   to denote the set of maximal elements of Q. In Lean this is denote by
   `maximals (· ≤ ·) Q`. The use of `(· ≤ ·)` is required because `maximals` is
   well-defined for arbitrary binary relations.
 
-  Of course the dual concepts are written `IsMin x` and `minimals`.
+  Of course the dual concepts are written `IsMin x` and `minimals`. -/
 
-  For any nonempty finite subset Q of an order Q both `maximal _ Q` and
-  `minimal _ Q` are nonempty. Similarly, for any `x ∈ Q`, there is some
-  `y ∈ maximals _ Q` such that `x ≤ y`. As with many facts about finite sets,
+  def maximals_le [LE α] : Set α → Set α := maximals (· ≤ ·)
+
+  def minimals_le [LE α] : Set α → Set α := minimals (· ≤ ·)
+
+/-
+  For any nonempty finite subset Q of an order Q both `maximals_le Q` and
+  `minimals_le Q` are nonempty. Similarly, for any `x ∈ Q`, there is some
+  `y ∈ maximals_le Q` such that `x ≤ y`. As with many facts about finite sets,
   these are surprisingly hard to prove.
 
   TODO: Prove these facts about finite sets.
@@ -656,14 +697,18 @@ theorem Function.Option.isMax_isSome {f : X → Option Y} (hf : ∀ x, (f x).isS
 
   The other way is called a "linear sum" or "lexicographic sum" of
   P and Q. In this order, `x ≤ y` if and only if any of the following holds:
+
   (i) `x : P` and `y : P` and `x ≤ y`
+
   (ii) `x : Q` and `y : Q` and `x ≤ y`
+
   (iii) `x : P` and `y : Q`
+
   That is, the orders of both P and Q are preserved, and everything in P
-  is ≤ everything in Q.
+  is `≤` everything in Q.
 
   To access this instance of the order on the sum of P and Q we can write
-  `P ⊕ₗ Q` with a subscript l on the `⊕`. There is a translation between
+  `P ⊕ₗ Q` with a subscript `l` on the `⊕`. There is a translation between
   `P ⊕ Q` and `P ⊕ₗ Q` given by `toLex` (behind the scenes, Lean calls `P ⊕ₗ Q`
   `Lex (P ⊕ Q)`). The backwards translation is called `ofLex`.
 
@@ -691,8 +736,11 @@ theorem Function.Option.isMax_isSome {f : X → Option Y} (hf : ∀ x, (f x).isS
 
   We can also define the "lexicographic order" on `P × Q` in which `x ≤ y`
   if and only if either
+
   (i) `x.1 < y.1` or
+
   (ii) `x.1 = y.1` and `x.2 ≤ y.2`
+
   Just as with `P ⊕ₗ Q`, Lean defines a type synonym `P ×ₗ Q` that is called
   `Lex (P × Q)` behind the scenes.
 -/
@@ -714,37 +762,37 @@ theorem Function.Option.isMax_isSome {f : X → Option Y} (hf : ∀ x, (f x).isS
 
 section Ch_1_26
 
-/-- Definition of forward function defining the OrderIso for 1.26 -/
-def φ' {n : ℕ} (A : Set (Fin n)) : Fin n → Prop := λ i ↦ i ∈ A
+/-- Definition of forward function defining the `OrderIso` for 1.26 -/
+def f {n : ℕ} (A : Set (Fin n)) : Fin n → Prop := λ i ↦ i ∈ A
 
 /--
-  Proof that φ' is an OrderIso. The proof of map_rel_iff' is
-  essentially what is in the textbook, but OrderIso requires us to
-  explicitly define the inverse, while OrderIso' only requires us
+  Proof that φ' is an `OrderIso`. The proof of `map_rel_iff'` is
+  essentially what is in the textbook, but `OrderIso` requires us to
+  explicitly define the inverse, while `OrderIso'` only requires us
   to demonstrate that the function is surjective.
 -/
 def φ : OrderIso (Set (Fin n)) (Fin n → Prop) := {
-  toFun := φ'
+  toFun := f
   invFun := λ s ι ↦ s ι
   left_inv := by intro x; rfl
   right_inv := by intro x; rfl
   map_rel_iff' := by
     simp; intro A B
     rw [Set.subset_def]
-    unfold φ'
+    unfold f
     simp [LE.le]
 }
 
 /--
-  An alternative approach that shows φ is a OrderIso'
+  An alternative approach that shows φ is a `OrderIso'`
 -/
-def φ_text : OrderIso' (Set (Fin n)) (Fin n → Prop) := {
-  toFun := φ'
+def φ' : OrderIso' (Set (Fin n)) (Fin n → Prop) := {
+  toFun := f
   map_rel_iff' := φ.map_rel_iff'
   surjective := by
     intro s
     use { ι | s ι }
-    unfold φ'; simp
+    unfold f; simp
 }
 
 end Ch_1_26
@@ -758,138 +806,267 @@ end Ch_1_26
 
   A down-set `Q : Set P` of a partial order P is defined by the property that
   if `x ∈ Q` and `(y : P) ≤ x`, then `y ∈ Q`. An up-set of P is defined dually.
-  This is sometime called a "decreasing set" or an "order ideal". Lean represents
-  this with a type called `LowerSet P` which has a carrier set of type `Set P`
-  and a proof that the down-set property holds. The dula notion of an up-set
-  is called `UpperSet P` in lean. It is also sometimes called an "increasing set"
-  or an "order filter".
+  This is sometime called a "decreasing set" or an "order ideal". The text denotes
+  the down-sets of P by 𝒪(P). Lean represents this with a type called `LowerSet P`
+  which has a carrier set of type `Set P` and a proof that the down-set property
+  holds. The dula notion of an up-set is called `UpperSet P` in lean. It is also
+  sometimes called an "increasing set" or an "order filter". The text does provide
+  a notation for `UpperSet P`. We teach Lean the 𝒪(P) notation here. So we will
+  prefer the notation from the book in these notes. We also introduce the notation
+  𝒪ᵈ(P) for `UpperSet P`.
+-/
 
+notation:100 "𝒪("arg:100")" => LowerSet arg
+notation:100 "𝒪ᵈ("arg:100")" => UpperSet arg
+
+/-
   Given `Q : Set P` we can define `{ x | ∃ y ∈ Q, x ≤ Q }` to be the downward
   closure of Q. The text denotes this as `↓Q`. In Lean this is called
-  `lowerClosure Q` (dually `upperClosure Q`). The down-set `lowerClosure Q` has
-  type `LowerSet P`.
+  `lowerClosure Q` (dually `upperClosure Q`). We introduce `↓ˢQ` and `↑ˢQ`
+  as Lean notation for `lowerClosure` and `upperClosure` respectively, where
+  the superscript `s` indicates that it takes a set as an argument.
+-/
+
+prefix:100 "↓ˢ" => lowerClosure
+prefix:100 "↑ˢ" => upperClosure
+
+/- The down-set `↓ˢQ` has type `𝒪(P)`, and `↑ˢQ` has type `𝒪ᵈ(P)`.
 
   A "principal down-set" or "principal ideal" is the downward closure of a singleton
   set `{x}`. The text uses `↓x` to represent the principle down-set of x. The set
   `Set.Iic x` happens to be a `LowerSet`. Lean has `LowerSet.Iic x`
-  that bundles `Set.Iic x` together with a proof that is a `LowerSet`. There is
-  thus an equivalence between `lowerClosure {x}` and `LowerSet.Iic x`.
-  -/
-
-example [PartialOrder P] (x : P) : lowerClosure {x} = LowerSet.Iic x := sorry
-
-/-
-  The textbook uses ↓x and ↑x to represent the principal order-ideal
-  and the principal order-filter of x. In Lean, we express those with
-  LowerSet.Iic x and LowerSet.Ici x respectively.
-
-  Similarly the textbook uses O(P) to represent the downsets of P ordered
-  by inclusion. In Lean we can simply write (LowerSet P), and since that
-  type is SetLike, it has a PartialOrder instance as expected.
+  that bundles `Set.Iic x` together with a proof that is a `LowerSet`.
+  We introduce the notations `↓ᵖx` and `↑ᵖx` to denote the principle down- and
+  up-sets `LowerSet.Iic x` and `UpperSet.Ici x` respectively.
 -/
 
-lemma Ch_1_30 [PartialOrder P] (x y : P) : List.TFAE [
-    x ≤ y,
-    Set.Iic x ⊆ Set.Iic y,
-    ∀ (Q : Set P), IsLowerSet Q → y ∈ Q → x ∈ Q ] := by
-  tfae_have 1 ↔ 2
-  · constructor
-    · intro le a mem
-      simp at mem ⊢
-      exact mem.trans le
-    · intro sub
-      specialize @sub x (by simp)
-      change x ∈ LowerSet.Iic y at sub
-      exact LowerSet.mem_Iic_iff.1 sub
-  tfae_have 2 → 3
-  · intro sub Q ls mem
-    have : x ≤ x := by rfl
-    rw [←LowerSet.mem_Iic_iff] at this
-    specialize sub this
-    change x ∈ LowerSet.Iic y at sub
-    unfold IsLowerSet at ls
-    exact ls sub mem
-  tfae_have 3 → 2
-  · intro h a mem
-    simp at mem
-    specialize h (Set.Iic y) (isLowerSet_Iic y) (by simp)
-    simp at h ⊢
-    exact mem.trans h
-  tfae_finish
+prefix:100 "↓ᵖ" => LowerSet.Iic
+prefix:100 "↑ᵖ" => UpperSet.Ici
 
-lemma Ch_1_30_1_iff_2 [PartialOrder P] (x y : P) : x ≤ y ↔ LowerSet.Iic x ⊆ LowerSet.Iic y := by
-  constructor
-  · intro le a mem
-    simp at mem ⊢
-    exact mem.trans le
-  · intro sub
-    specialize @sub x (by simp)
-    change x ∈ LowerSet.Iic y at sub
-    exact LowerSet.mem_Iic_iff.1 sub
+/-
+  There is an equivalence between `↓ˢ{x}` and `↓ᵖx`.
+-/
 
-lemma Ch_1_30_2_iff_3 [PartialOrder P] (x y : P) :
-    LowerSet.Iic x ⊆ LowerSet.Iic y ↔ ∀ (Q : LowerSet P), y ∈ Q → x ∈ Q := by
-  constructor
-  · intro sub Q mem
-    specialize @sub x (by simp)
-    change x ∈ LowerSet.Iic y at sub
-    simp at sub
-    apply Q.lower' sub mem
-  · intro h a mem
-    simp at mem ⊢
-    specialize h (LowerSet.Iic y) (by simp)
-    simp at h ⊢
-    exact mem.trans h
+lemma example_1_27 [PartialOrder P] (x : P) : ↓ˢ{x} = ↓ᵖx :=
+  lowerClosure_singleton x
 
-lemma Ch_1_30_1_iff_3 [PartialOrder P] (x y : P) : x ≤ y ↔ ∀ (Q : LowerSet P), y ∈ Q → x ∈ Q := by
-  rw [Ch_1_30_1_iff_2, Ch_1_30_2_iff_3]
+/-!
+  The text says it is easy to see that `↓ˢQ` is the smallest LowerSet
+  containing Q, and that Q is a LowerSet if and only if `↓ˢQ = Q`.
+  We show these (and their duals) below.
+-/
 
-lemma Ch_1_30' [PartialOrder P] (x y : P) : List.TFAE [
-    x ≤ y,
-    LowerSet.Iic x ⊆ LowerSet.Iic y,
-    ∀ (Q : LowerSet P), y ∈ Q → x ∈ Q ] := by
-  tfae_have 1 ↔ 2
-  · exact Ch_1_30_1_iff_2 x y
-  tfae_have 2 ↔ 3
-  · exact Ch_1_30_2_iff_3 x y
-  tfae_finish
+theorem lowerClosure_smallest [PartialOrder P] (Q : Set P) (R : 𝒪(P)) (sub : Q ⊆ R) :
+    ↓ˢQ ⊆ R := by
+  intro x mem
+  obtain ⟨a, ha1, ha2⟩ := mem
+  have mema : a ∈ R := sub ha1
+  apply R.lower' ha2 mema
 
-attribute [local simp] WithTop.map WithTop.le_none
+theorem upperClosure_smallest [PartialOrder P] (Q : Set P) (R : 𝒪ᵈ(P)) (le : Q ⊆ R) :
+    ↑ˢQ ⊆ R := by
+  intro x mem
+  obtain ⟨a, ha1, ha2⟩ := mem
+  have mema : a ∈ R := le ha1
+  apply R.upper' ha2 mema
 
-example [PartialOrder P] [PartialOrder Q] (f : P ≃o Q) : WithTop P ≃o WithTop Q :=
+theorem lowerClosure_eq_self_iff [PartialOrder P] (Q : Set P) :
+    ↓ˢQ = Q ↔ IsLowerSet Q := by
+  constructor <;> intro h
+  · rw [←h]; exact (lowerClosure Q).lower'
+  · exact IsLowerSet.lowerClosure h
+
+theorem upperClosure_eq_self_iff [PartialOrder P] (Q : Set P) :
+    ↑ˢQ = Q ↔ IsUpperSet Q := by
+  constructor <;> intro h
+  · rw [←h]; exact (upperClosure Q).upper'
+  · exact IsUpperSet.upperClosure h
+
+/-!
+  # 1.28 The ordered set 𝒪(P) of down-sets
+
+  As mentioned above, certain restricted families of `Set P` can be given
+  an order structure. One important such family is 𝒪(P), the set of down-sets
+  of P. It has a default instance of `PartialOrder` on it.
+
+  When P is finite, every nonempty down-set is expressible as a finite
+  union of principal down-sets. As with other facts about finite sets,
+  we omit the proof of this fact (which not given in the text either).
+-/
+
+/-!
+  # 1.29 Examples
+
+  Several of the examples would not be illuminated by formalization.
+  However, the text notes that if `Q ⊆ P` is an antichain, then the down-sets of
+  Q are all subsets of Q. This is written `𝒪(Q) ≃o Set Q` where
+  we don't use equality, but rather demonstrate an order-isomorphism.
+-/
+
+theorem LowerSet.IsAntichain [PartialOrder P] {Q : Set P} (h : IsAntichain (· ≤ ·) Q) :
+    𝒪(Q) ≃o Set Q :=
   {
-  toFun := WithTop.map f.toFun --Option.map f.toFun
-  invFun := WithTop.map f.invFun
-  left_inv := (Equiv.optionCongr f.toEquiv).left_inv
-  right_inv := (Equiv.optionCongr f.toEquiv).right_inv
-  map_rel_iff' := @fun a b => by
-    cases' a with a _ <;> cases' b with b _
-    · simp
-    · simp; constructor <;> intro le <;>
-      simp [WithTop.none_eq_top, WithTop.some_eq_coe] at le
-    · simp
-    · simp
+    toFun := LowerSet.carrier -- The coersion from LowerSet Q to Set Q
+    invFun := λ s ↦
+      ⟨s, by -- Must prove s is a lower set
+        intro a b le mem
+        rw [le_iff_lt_or_eq] at le
+        cases' le with lt eq
+        · exfalso;
+          have aq : ↑a ∈ Q := by simp
+          have bq : ↑b ∈ Q := by simp
+          apply IsAntichain.not_lt h bq aq lt
+        · rw [eq]; exact mem⟩
+    left_inv := λ a ↦ by simp; rfl
+    right_inv := λ a ↦ by simp
+    map_rel_iff' := by simp
   }
 
+/-!
+  If we consider the n-element chain `Fin n`, then 𝒪(P) consists of all principal
+  lower sets ↓x together with ∅.
+
+  This is surprisingly hard to prove. It requires more API around embedding
+  `Fin n` into `Fin (n + 1)`. Currently there are order embeddings, but there is
+  no API around what it does to `LowerSets`
+
+  TODO: Add more API around LowerSets in the embedding of `Fin n` into `Fin (n + 1)`
+-/
+
+/- def LowerSet.Fin_succ_orderIso : Fin (n + 1) ≃o LowerSet (Fin n) :=
+  {
+    toFun := λ
+      | ⟨0, _⟩ => ∅
+      | ⟨k + 1, hl⟩ => Iic ⟨k, by linarith⟩
+    invFun := λ ls ↦ if h : ls = ∅ then 0 else by sorry
+    left_inv := sorry
+    right_inv := sorry
+  }
+
+theorem LowerSet.Fin_orderIso (ls : Set (Fin n)) :
+    IsLowerSet ls ↔ (ls = ∅ ∨ ∃ x, ls = (Iic x).carrier) := by
+  constructor <;> intro h
+  · induction n with
+    | zero => left; exact Set.eq_empty_of_isEmpty ls
+    | succ k ih => sorry
+  · cases' h with h h
+    · rw [h]; exact isLowerSet_empty
+    · obtain ⟨x, hx⟩ := h; rw [hx]; exact (Iic x).lower' -/
+
+/-!
+  # 1.30 Lemma
+
+  Let `P` be an ordered set and `x, y ∈ P`. Then the following are equivalent
+  (i) `x ≤ y`
+  (ii) `↓x ⊆ ↓y`
+  (iii) `∀ Q : LowerSet P, y ∈ Q → x ∈ Q`
+-/
+
+theorem LowerSet.Iic_sub_iff_le [PartialOrder P] {x y : P} :
+    ↓ᵖx ⊆ ↓ᵖy ↔ x ≤ y := by
+  constructor <;> intro h
+  · specialize @h x (Iic_mem_self x)
+    exact LowerSet.mem_Iic_iff.mp h
+  · intro a mem
+    exact mem.trans h
+
+theorem LowerSet.mem_of_mem_iff_Iic_sub [PartialOrder P] {x y : P} :
+    (∀ Q : 𝒪(P), y ∈ Q → x ∈ Q) ↔ ↓ᵖx ⊆ ↓ᵖy := by
+  constructor <;> intro h
+  · intro a mem
+    simp at mem
+    specialize h (Iic y) (Iic_mem_self y)
+    simp at h ⊢
+    exact mem.trans h
+  · intro Q mem
+    specialize @h x (Iic_mem_self x)
+    exact Q.lower' h mem
+
+theorem LowerSet.mem_of_mem_iff_le [PartialOrder P] {x y : P} :
+    (∀ Q : 𝒪(P), y ∈ Q → x ∈ Q) ↔ x ≤ y := by
+  rw [mem_of_mem_iff_Iic_sub, Iic_sub_iff_le]
+
+/-!
+  # 1.31 O(P) and duality
+
+  Down-sets and up-sets are not only related by duality, but also by
+  complementation. `Q` is a lower set of `P` if and only if `Qᶜ` is
+  an upper set of `P` (or a lower set of `Pᵒᵈ`). This result exists in Lean
+  already.
+-/
+
+lemma example_1_31a [PartialOrder P] (Q : LowerSet P) : 𝒪ᵈ(P) := LowerSet.compl Q
+lemma example_1_31b [PartialOrder P] (Q : UpperSet P) : 𝒪(P) := UpperSet.compl Q
+
+/-!
+  We have `A ⊆ B` if and only if `Bᶜ ⊆ Aᶜ`.
+-/
+
+lemma example_1_31c [PartialOrder P] (A B : Set P) : A ⊆ B ↔ Bᶜ ⊆ Aᶜ := by
+  simp only [Set.compl_subset_compl]
+
+/-!
+  It follows that 𝒪(P)ᵒᵈ ≃o 𝒪(Pᵒᵈ).
+-/
+
+theorem LowerSet.dual_orderIso [PartialOrder P] :
+    𝒪(P)ᵒᵈ ≃o 𝒪(Pᵒᵈ) :=
+  {
+    toFun := λ s ↦
+      ⟨s.carrierᶜ, by
+        intro a b le memac memb
+        exact memac (s.lower' le memb)⟩
+    invFun := λ s ↦
+      ⟨s.carrierᶜ, by
+        intro a b le memac memb
+        exact memac (s.lower' le memb)⟩
+    left_inv := λ s ↦ by simp; rfl
+    right_inv := λ s ↦ by simp; rfl
+    map_rel_iff' := by
+      intro s t; --simp only [carrier_eq_coe, Equiv.coe_fn_mk]
+      constructor <;> intro h
+      · intro _ mem;
+        obtain ⟨s', _⟩ := s
+        obtain ⟨t', _⟩ := t
+        change s'ᶜ ⊆ t'ᶜ at h
+        rw [Set.compl_subset_compl] at h
+        exact h mem
+      · intro x memsc memt
+        exact memsc (h memt)
+  }
+
+/-!
+  # 1.32 Proposition
+
+  This proposition is about equivalent ways to decompose a partial order.
+
+  (ia) 𝒪(P ⊕ₗ 1) ≃o 𝒪(P) ⊕ₗ 1
+  (ib) 𝒪(1 ⊕ₗ P) ≃o 1 ⊕ₗ 𝒪(P)
+  (ii) 𝒪(P1 ⊕ P2) ≃o 𝒪(P1) × 𝒪(P2)
+
+  In our formalization we choose to represent `X ⊕ₗ 1` as `WithTop X` and
+  `1 ⊕ₗ X` as `WithBot X`.
+-/
+
+namespace Ch_1_32_ia
 
 @[simp]
-noncomputable def CH_1_32ia_toFun [PartialOrder P] : LowerSet (WithTop P) → WithTop (LowerSet P) :=
+noncomputable def φ [PartialOrder P] : 𝒪(WithTop P) → WithTop (𝒪(P)) :=
   λ | ⟨s, l⟩ =>
     if ⊤ ∈ s
     then ⊤
     else some ⟨{ x | some x ∈ s }, by
       intro a b le mem
-      unfold IsLowerSet at l
       exact l (WithTop.coe_le_coe.2 le) mem⟩
 
 @[simp]
-def CH_1_32ia_invFun [PartialOrder P] : WithTop (LowerSet P) → LowerSet (WithTop P) :=
+def ψ [PartialOrder P] : WithTop (𝒪(P)) → 𝒪(WithTop P) :=
   λ
   | some s =>
     ⟨{ some x | x ∈ s }, by
       intro c d le mem
       obtain ⟨x, hx1, hx2⟩ := mem
-      rw [←hx2] at le
+      subst c
       use (WithTop.untop_le d le)
       have le' := le
       rw [←WithTop.coe_untop_le d le] at le'
@@ -898,9 +1075,9 @@ def CH_1_32ia_invFun [PartialOrder P] : WithTop (LowerSet P) → LowerSet (WithT
       · exact WithTop.coe_untop_le d le ⟩
   | ⊤ => LowerSet.Iic ⊤
 
-lemma CH_1_32_left_inv [PartialOrder P] :
-    Function.LeftInverse CH_1_32ia_invFun
-    (CH_1_32ia_toFun : LowerSet (WithTop P) → WithTop (LowerSet P)) := by
+lemma left_inv [PartialOrder P] :
+    Function.LeftInverse ψ
+    (φ : 𝒪(WithTop P) → WithTop (𝒪(P))) := by
   intro s; ext x
   simp
   split
@@ -920,9 +1097,9 @@ lemma CH_1_32_left_inv [PartialOrder P] :
     · apply s.lower' (WithTop.le_none) h
     · simp
 
-lemma CH_1_32_right_inv [PartialOrder P] :
-    Function.RightInverse CH_1_32ia_invFun
-    (CH_1_32ia_toFun : LowerSet (WithTop P) → WithTop (LowerSet P)) := by
+lemma right_inv [PartialOrder P] :
+    Function.RightInverse ψ
+    (φ : 𝒪(WithTop P) → WithTop (𝒪(P))) := by
   intro s; simp
   split_ifs with h
   · split at h
@@ -941,19 +1118,19 @@ lemma CH_1_32_right_inv [PartialOrder P] :
     case neg.h_2 t heq
     · simp at h
 
-lemma CH_1_32_aux [PartialOrder P] {a : LowerSet (WithTop P)}
+lemma aux [PartialOrder P] {a : 𝒪(WithTop P)}
     (h : ⊤ ∈ a) : ∀ x, x ∈ a := by
   intro x; cases x with
   | some x => apply a.lower' (WithTop.le_none) h
   | none => exact h
 
-lemma CH_1_32_map_rel_iff [PartialOrder P] {a b : LowerSet (WithTop P)} :
-    CH_1_32ia_toFun a ≤ CH_1_32ia_toFun b ↔ a ≤ b := by
+lemma map_rel_iff [PartialOrder P] {a b : 𝒪(WithTop P)} :
+    φ a ≤ φ b ↔ a ≤ b := by
   simp
   split_ifs with h1 h2 h2
   · simp
     intro x _
-    exact CH_1_32_aux h2 x
+    exact aux h2 x
   · simp
     intro le
     apply h2
@@ -961,7 +1138,7 @@ lemma CH_1_32_map_rel_iff [PartialOrder P] {a b : LowerSet (WithTop P)} :
     exact le ⊤ h1
   · simp
     intro x _
-    exact CH_1_32_aux h2 x
+    exact aux h2 x
   · simp
     constructor <;> intro le
     · intro y mem; simp at mem ⊢
@@ -974,14 +1151,120 @@ lemma CH_1_32_map_rel_iff [PartialOrder P] {a b : LowerSet (WithTop P)} :
       change a ⊆ b at le
       exact le _ mem
 
-noncomputable def Ch_1_32ia' [PartialOrder P] : OrderIso (LowerSet (WithTop P)) (WithTop (LowerSet P)) :=
+noncomputable def Ch_1_32ia' [PartialOrder P] : OrderIso (𝒪(WithTop P)) (WithTop (𝒪(P))) :=
   {
-    toFun := CH_1_32ia_toFun
-    invFun := CH_1_32ia_invFun
-    left_inv := CH_1_32_left_inv
-    right_inv := CH_1_32_right_inv
-    map_rel_iff' := CH_1_32_map_rel_iff
+    toFun := φ
+    invFun := ψ
+    left_inv := left_inv
+    right_inv := right_inv
+    map_rel_iff' := map_rel_iff
   }
 
+end Ch_1_32_ia
+
+namespace Ch_1_32_ib
+
+@[simp]
+noncomputable def toFun [PartialOrder P] : 𝒪(WithBot P) → WithBot (𝒪(P)) :=
+  λ | ⟨s, l⟩ =>
+    if ⊥ ∈ s
+    then some ⟨{ x | some x ∈ s }, by
+      intro a b le mem
+      exact l (WithBot.coe_le_coe.2 le) mem ⟩
+    else ⊥
+
+@[simp]
+def invFun [PartialOrder P] : WithBot (LowerSet P) → LowerSet (WithBot P) :=
+  λ
+  | some s =>
+    ⟨{ some x | x ∈ s } ∪ {⊥}, by
+      intro c d le mem
+      cases mem with
+      | inl mem =>
+        obtain ⟨x, hx1, hx2⟩ := mem
+        subst c
+        cases d with
+        | none => right; simp; rw [WithBot.none_eq_bot]
+        | some d =>
+          left; simp at le ⊢; exact s.lower' le hx1
+      | inr mem => right; subst c; rw [←eq_bot_iff] at le; subst d; simp ⟩
+  | ⊥ => ⟨∅, by intro _ _ _ _; simp_all⟩
+
+def left_inv [PartialOrder P] :
+    Function.LeftInverse invFun
+    (toFun : 𝒪(WithBot P) → WithBot (𝒪(P))) := by
+  intro s; simp; split_ifs with h
+  · split
+    case pos.h_1 x t heq
+    · simp_all
+      obtain ⟨t', ht⟩ := t
+      obtain ⟨s', hs⟩ := s
+      simp at heq; subst t'; simp
+      ext y; constructor
+      · intro mem; simp at mem
+        cases mem with
+        | inl eq => subst eq; exact h
+        | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1
+      · intro mem
+        cases y with
+        | none => simp; rw [WithBot.none_eq_bot]
+        | some y => simp; exact mem
+    case pos.h_2 t heq
+    · simp_all
+  · split
+    case neg.h_1 x t heq
+    · cases heq
+    case neg.h_2 t _
+    · ext x; simp
+      intro xmem
+      apply h
+      apply s.lower' (OrderBot.bot_le x) xmem
+
+def right_inv [PartialOrder P] :
+    Function.RightInverse invFun
+    (toFun : 𝒪(WithBot P) → WithBot (𝒪(P))) := by
+  intro s; simp; split_ifs with h
+  · split at h
+    case pos.h_1 _ t s
+    · congr; simp
+      ext x; simp
+      constructor <;> intro mem
+      · obtain ⟨x1, hx1, hx2⟩ := mem; simp at hx2;
+        subst x; exact hx1
+      · use x
+    case pos.h_2 t s
+    · simp at h
+  · split at h
+    case neg.h_1 _ t s
+    · exfalso; apply h; simp
+    case neg.h_2 t s
+    · rfl
+
+def map_rel_iff' [PartialOrder P] :
+    ∀ {x y : 𝒪(WithBot P)}, toFun x ≤ toFun y ↔ x ≤ y := by
+  intro x y
+  simp; split_ifs with h1 h2 h2
+  · simp
+    constructor <;> intro le
+    · intro a amem
+      cases a with
+      | some a' => exact le amem
+      | none => exact h2
+    · intro a amem
+      exact le amem
+  · simp; intro le; apply h2; exact le h1
+  · simp; intro a amem; exfalso; apply h1; apply x.lower' (OrderBot.bot_le a) amem
+  · simp; intro a amem; exfalso; apply h1; apply x.lower' (OrderBot.bot_le a) amem
+
+noncomputable def Ch_1_32_ib [PartialOrder P] : 𝒪(WithBot P) ≃o WithBot (𝒪(P)) :=
+  {
+    toFun := toFun
+    invFun := invFun
+    left_inv := left_inv
+    right_inv := right_inv
+    map_rel_iff' := map_rel_iff'
+  }
+
+end Ch_1_32_ib
 /- def Ch_1_32ib [PartialOrder P] : OrderIso (LowerSet (WithBot P)) (WithBot (LowerSet P)) :=
   WithBot.toDual ∘ Ch_1_32ia -/
