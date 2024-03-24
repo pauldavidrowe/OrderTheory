@@ -1,1 +1,2 @@
-import OrderTheory.Chapter1
+import OrderTheory.Chapter01
+import OrderTheory.Exercises01

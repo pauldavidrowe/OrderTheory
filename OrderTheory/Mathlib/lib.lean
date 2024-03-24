@@ -1,5 +1,12 @@
 import Mathlib.Order.WithBot
 import Mathlib.Order.UpperLower.Basic
+import Mathlib.Order.Cover
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Order.Minimal
+import Mathlib.Data.Sum.Order
+import Mathlib.Order.Chain
+
+import Std.Data.List.Lemmas
 
 def WithTop.untop_le [PartialOrder α] {y : α} (x : WithTop α) : x ≤ some y → α :=
   match x with
@@ -81,3 +88,29 @@ instance OrderDual.hasSubset [HasSubset P] [LE P] : HasSubset (Pᵒᵈ) :=
 @[simp]
 theorem OrderDual.hasSubset_def [HasSubset P] [LE P] {s t : Pᵒᵈ} (h : s ⊆ t) :
     OrderDual.ofDual s ⊆ OrderDual.ofDual t := by simp [HasSubset.Subset] at h; exact h
+
+lemma List.prefix_of_prefix_append {l1 l2 l3 : List α} (h : l1 ++ l3 <+: l2) : l1 <+: l2 := by
+  obtain ⟨u, hu⟩ := h
+  use l3 ++ u
+  simp_all
+
+lemma List.prefix_append_of_prefix {l1 l2 l3 : List α} (h : l1 <+: l2) : l1 <+: l2 ++ l3 := by
+  obtain ⟨u, hu⟩ := h
+  use u ++ l3
+  rw [←hu]
+  simp
+
+lemma List.prefix_of_ne_concat (h : l1 ≠ l2 ++ [a]) (h2 : l1 <+: l2 ++ [a]) : l1 <+: l2 := by
+  obtain ⟨u, hu⟩ := h2
+  by_cases mt : u = []
+  · subst u; simp at hu; contradiction
+  · use List.take (List.length u - 1) u
+    cases List.eq_nil_or_concat u with
+    | inl _ => contradiction
+    | inr h1 =>
+      obtain ⟨L, b, hlb⟩ := h1
+      subst u
+      simp
+      rw [←List.append_assoc, ←List.concat_eq_append, ←List.concat_eq_append] at hu
+      apply List.of_concat_eq_concat at hu
+      exact hu.1
