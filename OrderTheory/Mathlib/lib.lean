@@ -27,6 +27,16 @@ instance instLowerSetHasSubset [Preorder P] : HasSubset (LowerSet P) :=
   Subset := λ H K ↦ ∀ x, x ∈ H → x ∈ K
 }
 
+instance instLowerSetHasSSubset [Preorder P] : HasSSubset (LowerSet P) :=
+{
+  SSubset := λ H K ↦ H < K 
+}
+
+instance instUpperSetHasSSubset [Preorder P] : HasSSubset (UpperSet P) :=
+{
+  SSubset := λ H K ↦ H < K 
+}
+
 instance instUpperSetHasSubset [Preorder P] : HasSubset (UpperSet P) :=
 {
   Subset := λ H K ↦ ∀ x, x ∈ H → x ∈ K
@@ -37,6 +47,40 @@ instance LowerSet.instEmptyCollection [LE P] : EmptyCollection (LowerSet P) :=
   emptyCollection := ⟨∅, isLowerSet_empty⟩
 }
 
+@[simp]
+theorem LowerSet.subset_lift [Preorder P] {S T : LowerSet P} :
+    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl 
+
+@[simp]
+theorem LowerSet.ssubset_lift [Preorder P] {S T : LowerSet P} :
+    S ⊂ T ↔ S.carrier ⊂ T.carrier := by rfl 
+
+@[simp]
+theorem LowerSet.lt_lift [Preorder P] {S T : LowerSet P} :
+    S < T ↔ S.carrier < T.carrier := by rfl 
+    
+@[simp]
+theorem UpperSet.subset_lift [Preorder P] {S T : UpperSet P} :
+    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl 
+
+instance instLowerSetUnion [Preorder α] : Union (LowerSet α) := 
+  { union := λ s t ↦ ⟨s.carrier ∪ t.carrier, by
+      intro x y le mem
+      cases mem with 
+      | inl mem => left; exact s.lower le mem 
+      | inr mem => right; exact t.lower le mem ⟩ 
+  }
+
+instance instUpperSetUnion [Preorder α] : Union (UpperSet α) := 
+  { union := λ s t ↦ ⟨s.carrier ∪ t.carrier, by
+      intro x y le mem
+      cases mem with 
+      | inl mem => left; exact s.upper le mem 
+      | inr mem => right; exact t.upper le mem ⟩ 
+  }
+
+
+    
 theorem LowerSet.emptyCollection_iff [LE P] : (∅ : LowerSet P) = ⟨∅, isLowerSet_empty⟩ := rfl
 
 theorem LowerSet.eq_empty_carrier [Preorder P] (ls : LowerSet P) :

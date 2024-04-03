@@ -84,13 +84,13 @@ namespace Ex_1_6
 
 def P := List (Fin 2)
 
-instance instBinStringLE : LE P :=
+local instance instBinStringLE : LE P :=
 {
   le := λ u v ↦ (v <+: u) ∨
   (∃ x, x ++ [0] <+: v ∧ x ++ [1] <+: u)
 }
 
-instance instBinStringLT : LT P :=
+local instance instBinStringLT : LT P :=
   {
     lt := λ u v ↦ instBinStringLE.le u v ∧ ¬instBinStringLE.le v u
   }
@@ -377,12 +377,192 @@ lemma exercise_1_10b [LinearOrder P] [LinearOrder Q] :
       | inl le => left; simpa
       | inr le => right; simpa
 
-/- lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
-    A ⋖ B ↔ ∃ b ∉ A, IsMinOn (· ∉ A) (↑A)ᶜ b ∧ Set.insert b A = B := by
+
+lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
+    A ⋖ B ↔ ∃ b ∈ minimals_le (↑A)ᶜ, Set.insert b ↑A = B.carrier := by
   constructor <;> intro h
   · obtain ⟨h1, h2⟩ := h
-    apply Set.exists_of_ssubset at h1
-    obtain ⟨x, h1, h3⟩ := h1
-    use x, h3
-  · sorry
- -/
+    have h3 := Set.exists_of_ssubset h1
+    obtain ⟨x, h3, h4⟩ := h3
+    use x
+    -- Claim: A ∪ {z : z ≤ y} is strictly between A and B
+    -- First we have to show that it's a lower set
+    /- have ls : ∀ y, y ∉ A → IsLowerSet {z | z ≤ y} := by 
+      intro y ymem c d le cmem; exact le.trans cmem  -/
+    -- Then we have to show its strictly greater than A
+    --have Alt : ∀ y, (ymem : y ∉ A) → A < A ∪ ⟨{z | z ≤ y}, ls y ymem⟩ := by 
+    have Alt : ∀ y, y ∉ A → A < A ∪ LowerSet.Iic y := by 
+      intro y ymem
+      constructor
+      · apply Set.subset_union_of_subset_left (by rfl) _ 
+      · intro z 
+        apply ymem
+        exact z (by right; simp : y ∈ A ∪ ↓ᵖy)
+    --have ltB : ∀ y
+    have isMin : x ∈ minimals_le (↑A)ᶜ := by
+      by_contra nMin; simp [minimals_le, minimals] at nMin 
+      specialize nMin h4 
+      obtain ⟨y, hy1, hy2, hy3⟩ := nMin
+      have ltB : A ∪ ↓ᵖy < B := by 
+        constructor
+        · intro z mem
+          exact Or.elim mem (λ m ↦ h1.1 m) (λ m ↦ B.lower' (m.trans hy1) h3)
+        · intro zmem
+          specialize zmem h3 
+          exact Or.elim zmem (λ _ ↦ by contradiction) (λ _ ↦ by contradiction) 
+      exact h2 (Alt y hy2) ltB 
+    use isMin 
+    ext z 
+    constructor <;> intro mem
+    · cases mem with 
+      | inl mem => subst z; exact h3 
+      | inr mem => exact h1.1 mem 
+    · by_cases h5 : z ∈ ↑A
+      · right; exact h5 
+      · left; 
+        --by_contra neq
+        --simp [minimals_le, mem_minimals_iff] at isMin 
+        specialize h2 (Alt x h4)
+        by_contra neq
+        apply h2 
+        constructor
+        · intro w wmem
+          cases wmem with 
+          | inl wmem => exact h1.1 wmem
+          | inr wmem => exact B.lower' wmem h3 
+        · intro sub
+          specialize sub mem
+          cases sub with 
+          | inl sub => contradiction
+          | inr sub => 
+            simp at sub 
+            simp [minimals_le, mem_minimals_iff] at isMin 
+            exact neq (isMin.2 h5 sub).symm 
+  · obtain ⟨b, min, eq⟩ := h; simp at eq 
+    constructor
+    · constructor
+      · rw [←eq]
+        exact Set.subset_insert b A 
+      · intro sub
+        rw [←eq] at sub 
+        specialize sub (Set.mem_insert b ↑A)
+        have bmem := min.1
+        contradiction
+    · intro C ⟨AC1, AC2⟩ ⟨CB1, CB2⟩
+      rw [←eq] at CB1 CB2
+      by_cases bmem : b ∈ ↑C
+      · apply CB2 
+        intro x xmem
+        cases xmem with 
+        | inl xmem => subst x; exact bmem 
+        | inr xmem => exact AC1 xmem 
+      · apply AC2 
+        intro c cmem
+        cases CB1 cmem with 
+        | inl eq => subst c; contradiction
+        | inr cmem => exact cmem 
+
+lemma funPO [PartialOrder Y] {f g : X → Y} : 
+    f < g ↔ f ≤ g ∧ ∃ x, f x < g x := by 
+  constructor
+  · intro ⟨le, nle⟩
+    use le 
+    simp [LE.le] at nle 
+    obtain ⟨x, hx⟩ := nle 
+    use x 
+    specialize le x 
+    rw [lt_iff_le_not_le]
+    tauto
+  · intro ⟨le, x, lt⟩ 
+    simp [LT.lt] 
+    use le 
+    intro le'
+    specialize le' x 
+    rw [lt_iff_le_not_le] at lt
+    exact lt.2 le' 
+
+lemma exercise_1_27a [PartialOrder Y] (f g : X → Y) : 
+    f ⋖ g ↔ ∃ x₀ : X, (∀ x, x ≠ x₀ → f x = g x) ∧ (f x₀ ⋖ g x₀) := by
+  constructor 
+  · intro ⟨lt, fg⟩
+    rw [funPO] at lt 
+    obtain ⟨le, x₀, lt⟩ := lt 
+    use x₀
+    constructor
+    · by_contra neq
+      push_neg at neq 
+      obtain ⟨x₁, neq, hx₁⟩ := neq 
+      have lt1 : f x₁ < g x₁ := lt_iff_le_and_ne.mpr ⟨(le x₁), hx₁⟩
+      set h : X → Y := λ x ↦ if x = x₁ then f x else g x with hh 
+      have fh : f < h := by 
+        rw [funPO]
+        constructor
+        · intro y 
+          by_cases hy : y = x₁
+          · subst y; simp [hh] 
+          · simp [hh]; rw [if_neg hy]; exact le y 
+        · use x₀; simp [hh]; rw [if_neg neq.symm]; exact lt 
+      have hg : h < g := by 
+        rw [funPO]
+        constructor
+        · intro y 
+          by_cases hy : y = x₁
+          · subst y; simp [hh]; exact le x₁ 
+          · simp [hh]; rw [if_neg hy]
+        · use x₁
+          simp [hh]; exact lt1 
+      exact fg fh hg 
+    · constructor 
+      · exact lt 
+      · by_contra ex; push_neg at ex 
+        obtain ⟨x₁, fx, xg⟩ := ex 
+        set h : X → Y := λ x ↦ if x = x₀ then x₁ else g x with hh
+        have fh : f < h := by 
+          rw [funPO]
+          constructor
+          · intro y 
+            by_cases hy : y = x₀ 
+            · subst y; simp [hh]; exact le_of_lt fx 
+            · simp [hh]; rw [if_neg hy]; exact le y 
+          · use x₀; simp [hh]; exact fx 
+        have hg : h < g := by 
+          rw [funPO]
+          constructor
+          · intro y 
+            by_cases hy : y = x₀ 
+            · subst y; simp [hh]; exact le_of_lt xg 
+            · simp [hh]; rw [if_neg hy] 
+          · use x₀; simp [hh]; exact xg 
+        exact fg fh hg 
+  · intro ⟨x₀, eq, cov⟩
+    constructor
+    · rw [funPO]
+      constructor
+      · intro x
+        by_cases hx : x = x₀  
+        · subst x; exact le_of_lt cov.1 
+        · specialize eq x hx; rw [eq] 
+      · use x₀; 
+        obtain ⟨cov1, _⟩ := cov 
+        exact cov1 
+    · intro h fh hg 
+      obtain ⟨cov1, cov2⟩ := cov 
+      rw [funPO] at fh hg 
+      obtain ⟨fh, x₁, fhx⟩ := fh 
+      obtain ⟨hg, x₂, hgx⟩ := hg 
+      by_cases hx₁ : x₁ = x₀  
+      · subst x₁
+        by_cases hx₂ : x₂ = x₀ 
+        · subst x₂
+          exact cov2 fhx hgx 
+        · specialize eq _ hx₂; rw [←eq] at hgx 
+          rw [lt_iff_le_not_le] at hgx 
+          exact hgx.2 (fh x₂)
+      · specialize eq _ hx₁; rw [eq] at fhx 
+        rw [lt_iff_le_not_le] at fhx; 
+        exact fhx.2 (hg x₁)
+
+/-!
+  There are numerous other exercises that could be formalized, but I choose
+  to move on to later chapters. 
+-/
