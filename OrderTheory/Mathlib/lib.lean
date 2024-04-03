@@ -5,6 +5,7 @@ import Mathlib.Data.Fintype.Basic
 import Mathlib.Order.Minimal
 import Mathlib.Data.Sum.Order
 import Mathlib.Order.Chain
+import Mathlib.Tactic
 
 import Std.Data.List.Lemmas
 
@@ -114,3 +115,25 @@ lemma List.prefix_of_ne_concat (h : l1 ≠ l2 ++ [a]) (h2 : l1 <+: l2 ++ [a]) : 
       rw [←List.append_assoc, ←List.concat_eq_append, ←List.concat_eq_append] at hu
       apply List.of_concat_eq_concat at hu
       exact hu.1
+
+/-- Could this go into Mathlib? -/
+theorem List.prefix_of_eq_append {l1 l2 l3 l4 : List α} (h : l1 ++ l2 = l3 ++ l4) :
+    l1 <+: l3 ∨ l3 <+: l1 := by
+  have len : l1.length ≤ l3.length ∨ l3.length ≤ l1.length := by
+    apply LinearOrder.le_total
+  cases len with
+  | inl len =>
+    apply_fun List.take (l1.length) at h
+    rw[List.take_left, List.take_append_of_le_length len] at h
+    rw [h]
+    exact Or.inl (List.take_prefix (List.length l1) l3)
+  | inr len =>
+    apply_fun List.take (l3.length) at h
+    rw [List.take_left, List.take_append_of_le_length len] at h
+    rw [←h]
+    exact Or.inr (List.take_prefix (List.length l3) l1)
+
+theorem List.prefix_of_eq_append_append {l1 l2 l3 l1' l2' l3' : List α}
+    (h : l1 ++ l2 ++ l3 = l1' ++ l2' ++ l3') : l1 <+: l1' ∨ l1' <+: l1 := by
+  rw [List.append_assoc, List.append_assoc] at h
+  exact List.prefix_of_eq_append h
