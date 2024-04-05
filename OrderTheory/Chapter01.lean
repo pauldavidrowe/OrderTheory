@@ -826,8 +826,8 @@ end Ch_1_26
   𝒪ᵈ(P) for `UpperSet P`.
 -/
 
-notation:100 "𝒪("arg:25")" => LowerSet arg
-notation:100 "𝒪ᵈ("arg:25")" => UpperSet arg
+notation:max "𝒪("arg:25")" => LowerSet arg
+notation:max "𝒪ᵈ("arg:25")" => UpperSet arg
 
 /-
   Given `Q : Set P` we can define `{ x | ∃ y ∈ Q, x ≤ Q }` to be the downward
