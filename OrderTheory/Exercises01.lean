@@ -35,9 +35,7 @@ lemma exercise_1_5 : OrderTree (List (Fin 2)) :=
       intro l
       induction l using List.list_reverse_induction with
       | base =>
-        intro x xmem y ymem _
-        obtain ⟨u, hu⟩ := xmem
-        obtain ⟨v, hv⟩ := ymem
+        intro x ⟨u, hu⟩ y ⟨v, hv⟩ _
         apply List.append_eq_nil.mp at hu
         apply List.append_eq_nil.mp at hv
         left; rw [hu.1, hv.1]
@@ -46,31 +44,25 @@ lemma exercise_1_5 : OrderTree (List (Fin 2)) :=
         by_cases hx : x <+: frnt
         · by_cases hy : y <+: frnt
           · apply ih hx hy neq
-          · simp at ymem
-            have yeq : y = frnt ++ [bk] := by
+          · have yeq : y = frnt ++ [bk] := by
               by_contra h1
               apply hy
               exact List.prefix_of_ne_concat h1 ymem
             subst y
-            left
-            exact xmem
+            exact Or.inl xmem
         · by_cases y <+: frnt
-          · simp at xmem
-            have xeq : x = frnt ++ [bk] := by
+          · have xeq : x = frnt ++ [bk] := by
               by_contra h1
               apply hx
               exact List.prefix_of_ne_concat h1 xmem
             subst x
-            right
-            exact ymem
-          · simp at xmem
-            have xeq : x = frnt ++ [bk] := by
+            exact Or.inr ymem
+          · have xeq : x = frnt ++ [bk] := by
               by_contra h1
               apply hx
               exact List.prefix_of_ne_concat h1 xmem
             subst x
-            right
-            exact ymem
+            exact Or.inr ymem
   }
 
 /-!
@@ -362,7 +354,7 @@ lemma exercise_1_10b [LinearOrder P] [LinearOrder Q] :
   · cases h with
     | inl h =>
       obtain ⟨h1⟩ := h
-      rintro ⟨a1, a2⟩ ⟨b1, b2⟩
+      intro ⟨a1, a2⟩ ⟨b1, b2⟩
       specialize h1 a1 b1
       subst b1
       cases LinearOrder.le_total a2 b2 with
@@ -370,7 +362,7 @@ lemma exercise_1_10b [LinearOrder P] [LinearOrder Q] :
       | inr le => right; exact ⟨by rfl, le⟩
     | inr h =>
       obtain ⟨h1⟩ := h
-      rintro ⟨a1, a2⟩ ⟨b1, b2⟩
+      intro ⟨a1, a2⟩ ⟨b1, b2⟩
       specialize h1 a2 b2
       subst b2
       cases LinearOrder.le_total a1 b1 with
@@ -386,19 +378,15 @@ lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
     obtain ⟨x, h3, h4⟩ := h3
     use x
     -- Claim: A ∪ {z : z ≤ y} is strictly between A and B
-    -- First we have to show that it's a lower set
-    /- have ls : ∀ y, y ∉ A → IsLowerSet {z | z ≤ y} := by 
-      intro y ymem c d le cmem; exact le.trans cmem  -/
-    -- Then we have to show its strictly greater than A
-    --have Alt : ∀ y, (ymem : y ∉ A) → A < A ∪ ⟨{z | z ≤ y}, ls y ymem⟩ := by 
-    have Alt : ∀ y, y ∉ A → A < A ∪ LowerSet.Iic y := by 
+    -- So, we have to show its strictly greater than A by showing
+    -- the more general case
+    have Alt : ∀ y, y ∉ A → A < A ∪ LowerSet.Iic y := by
       intro y ymem
       constructor
       · apply Set.subset_union_of_subset_left (by rfl) _ 
       · intro z 
         apply ymem
         exact z (by right; simp : y ∈ A ∪ ↓ᵖy)
-    --have ltB : ∀ y
     have isMin : x ∈ minimals_le (↑A)ᶜ := by
       by_contra nMin; simp [minimals_le, minimals] at nMin 
       specialize nMin h4 
@@ -419,9 +407,7 @@ lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
       | inr mem => exact h1.1 mem 
     · by_cases h5 : z ∈ ↑A
       · right; exact h5 
-      · left; 
-        --by_contra neq
-        --simp [minimals_le, mem_minimals_iff] at isMin 
+      · left
         specialize h2 (Alt x h4)
         by_contra neq
         apply h2 

@@ -332,4 +332,88 @@ lemma example_2_6_3c [PartialOrder P]
     obtain ⟨i, hi⟩ := hAi 
     subst Ai 
     exact h i le mem   
+  
+@[simp]  
+local instance instOrderTop : OrderTop (WithTop (WithBot (Fin' n))) := 
+  {
+    top := none 
+    le_top := by simp
+  }
+  
+@[simp]
+local instance instOrderBot : OrderBot (WithTop (WithBot (Fin' n))) := 
+  { 
+    bot := some none 
+    bot_le := by
+      intro a 
+      cases a with 
+      | none => simp 
+      | some a => simp 
+  }
+    
+@[simp]
+noncomputable
+instance instrSup : Sup (WithTop (WithBot (Fin' n))) := 
+  {
+    sup := λ 
+      | ⊥, y => y 
+      | x, ⊥ => x 
+      | x, y => if x = y then x else ⊤ 
+  }
+
+@[simp]
+noncomputable
+local instance instInf : Inf (WithTop (WithBot (Fin' n))) :=
+  {
+    inf := λ
+      | x, ⊤ => x
+      | ⊤, y => y 
+      | x, y => if x = y then x else ⊥
+  }
+
+noncomputable 
+local instance instrSemilatticeSup {n : Nat} : SemilatticeSup (WithTop (WithBot (Fin' n))) := 
+  {
+    le_sup_left := by
+      intro x y 
+      cases_type* WithTop WithBot
+      all_goals simp_all
+      split_ifs <;> simp_all
+    le_sup_right := by 
+      intro x y 
+      cases_type* WithTop WithBot
+      all_goals simp_all
+      split_ifs <;> simp_all
+    sup_le := by 
+      intro x y z le1 le2
+      cases_type* WithTop WithBot <;> simp_all [LE.le]
+  }
+
+noncomputable 
+local instance instSemilatticeInf {n : Nat} : Lattice (WithTop (WithBot (Fin' n))) :=
+  {
+    inf_le_left := by 
+      intro x y  
+      cases_type* WithTop WithBot
+      all_goals simp_all
+      all_goals split_ifs <;> simp_all
+    inf_le_right := by 
+      intro x y 
+      cases_type* WithTop WithBot
+      all_goals simp_all
+      all_goals split_ifs <;> simp_all
+    le_inf := by 
+      intro x y z le1 le2
+      cases_type* WithTop WithBot 
+      all_goals try rw [WithTop.none_eq_top] at *
+      all_goals try simp_all
+      all_goals try rw [WithTop.none_eq_top] at *
+      all_goals try simp_all
+      all_goals split_ifs
+      all_goals try simp_all
+      case neg x y z h
+      · rw [Fin'.le_iff] at le1 le2 
+        subst y; subst z
+        contradiction
+  }
     

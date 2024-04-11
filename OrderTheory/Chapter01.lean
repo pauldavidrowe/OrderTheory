@@ -92,6 +92,14 @@ instance Fin'.instPartialOrder {n : Nat} : PartialOrder (Fin' n) :=
     le_antisymm := λ a b h1 _ ↦ h1
   }
 
+theorem Fin'.IsAntichain {n : Nat} : IsAntichain (· ≤ ·) (Set.univ : Set (Fin' n)) := by
+  intro x _ y _ neq le 
+  apply neq
+  simp [LE.le] at le 
+  assumption
+  
+theorem Fin'.le_iff {n : Nat} {x y : Fin' n} : x ≤ y ↔ x = y := by rfl
+
 /-!
   ## 1.4 Order Isomorphisms
 
@@ -464,76 +472,56 @@ lemma orderIso_iff_image_lt_lt [Fintype P] [Fintype Q] [PartialOrder P] [Partial
     }
     simp
 
+lemma image_covby_covby_of_image_lt_lt [Fintype P] [Fintype Q] [PartialOrder P]
+    [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
+    (∀ x y, f x < f y ↔ x < y) → (∀ x y, f x ⋖ f y ↔ x ⋖ y) := by
+  intro h x y
+  constructor
+  · intro ⟨lt, nlt⟩
+    constructor
+    · exact (h x y).1 lt
+    · by_contra h1; push_neg at h1
+      obtain ⟨w, hw⟩ := h1
+      apply @nlt (f w) ((h x w).2 hw.left)
+      exact (h w y).2 hw.right
+  · intro ⟨lt, nlt⟩
+    constructor
+    · exact (h x y).2 lt
+    · by_contra h1; push_neg at h1
+      obtain ⟨w, hw⟩ := h1
+      obtain ⟨u, hu⟩ := hf.2 w
+      rw [←hu] at hw
+      apply @nlt u ((h x u).1 hw.left)
+      exact (h u y).1 hw.right
+        
+lemma image_lt_lt_of_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
+    [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
+    (∀ x y, f x ⋖ f y ↔ x ⋖ y) → (∀ x y, f x < f y ↔ x < y) := by
+  intro h x y
+  rw [covChain_of_fintype, covChain_of_fintype]
+  constructor <;> intro ⟨n, hn⟩ <;> use n <;> revert x y
+  · induction n with
+    | zero => intro x y hn; exact hf.1 hn
+    | succ k ih =>
+      intro x y ⟨w, hw, covc⟩
+      use (Fintype.bijInv hf w)
+      have winv : w = f (Fintype.bijInv hf w) := by
+        symm; apply Fintype.rightInverse_bijInv hf
+      constructor
+      · rw [winv] at hw
+        exact (h x _).mp hw
+      · apply ih (Fintype.bijInv hf w) y
+        rwa [← winv]
+  · induction n with
+    | zero => intro x y hn; congr
+    | succ k ih =>
+      intro x y ⟨w, hw, covc⟩
+      exact ⟨f w, ⟨(h x w).2 hw, by apply ih w y covc⟩⟩  
+    
 lemma image_lt_lt_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
-    (∀ x y, f x < f y ↔ x < y) ↔ (∀ x y, f x ⋖ f y ↔ x ⋖ y) := by
-  constructor
-  · intro h x y
-    constructor
-    · simp [CovBy]
-      intro lt nlt
-      constructor
-      · exact (h x y).1 lt
-      · by_contra h1; push_neg at h1
-        obtain ⟨w, hw⟩ := h1
-        specialize @nlt (f w)
-        specialize nlt ((h x w).2 hw.left)
-        apply nlt
-        exact (h w y).2 hw.right
-    · simp [CovBy]
-      intro lt nlt
-      constructor
-      · exact (h x y).2 lt
-      · by_contra h1; push_neg at h1
-        obtain ⟨w, hw⟩ := h1
-        obtain ⟨u, hu⟩ := hf.2 w
-        rw [←hu] at hw
-        specialize @nlt u
-        specialize nlt ((h x u).1 hw.left)
-        apply nlt
-        exact (h u y).1 hw.right
-  · intro h x y
-    rw [covChain_of_fintype, covChain_of_fintype]
-    constructor
-    · intro lt
-      obtain ⟨n, hn⟩ := lt
-      use n
-      revert x y
-      induction n with
-      | zero =>
-        intro x y hn
-        simp [CovChain] at hn ⊢
-        exact hf.1 hn
-      | succ k ih =>
-        intro x y hn
-        simp [CovChain] at hn ⊢
-        obtain ⟨w, hw, covc⟩ := hn
-        use (Fintype.bijInv hf w)
-        have winv : w = f (Fintype.bijInv hf w) := by
-          symm
-          apply Fintype.rightInverse_bijInv hf
-        constructor
-        · rw [winv] at hw
-          exact (h x _).1 hw
-        · apply ih (Fintype.bijInv hf w) y
-          rwa [← winv]
-    · intro lt
-      obtain ⟨n, hn⟩ := lt
-      use n
-      revert x y
-      induction n with
-      | zero =>
-        intro x y hn
-        simp [CovChain] at hn ⊢
-        rw [hn]
-      | succ k ih =>
-        intro x y hn
-        simp [CovChain] at hn ⊢
-        obtain ⟨w, hw, covc⟩ := hn
-        use (f w)
-        constructor
-        · exact (h x w).2 hw
-        · apply ih w y covc
+    (∀ x y, f x < f y ↔ x < y) ↔ (∀ x y, f x ⋖ f y ↔ x ⋖ y) :=
+  ⟨image_covby_covby_of_image_lt_lt f hf, image_lt_lt_of_image_covby_covby f hf⟩
 
 lemma orderIso_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P] [PartialOrder Q]
     [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
@@ -689,9 +677,7 @@ instance Function.Option.instOrderBot : OrderBot (X → Option Y) :=
 
 theorem Function.Option.isMax_isSome {f : X → Option Y} (hf : ∀ x, (f x).isSome) :
     IsMax f := by
-  intro g le
-  simp [LE.le] at le ⊢
-  intro x _
+  intro g le x _
   exact (le (hf x)).symm
 
 /-!
@@ -868,17 +854,13 @@ lemma example_1_27 [PartialOrder P] (x : P) : ↓ˢ{x} = ↓ᵖx :=
 
 theorem lowerClosure_smallest [PartialOrder P] (Q : Set P) (R : 𝒪(P)) (sub : Q ⊆ R) :
     ↓ˢQ ⊆ R := by
-  intro x mem
-  obtain ⟨a, ha1, ha2⟩ := mem
-  have mema : a ∈ R := sub ha1
-  apply R.lower' ha2 mema
+  intro x ⟨a, ha1, ha2⟩
+  apply R.lower' ha2 (sub ha1)
 
 theorem upperClosure_smallest [PartialOrder P] (Q : Set P) (R : 𝒪ᵈ(P)) (le : Q ⊆ R) :
     ↑ˢQ ⊆ R := by
-  intro x mem
-  obtain ⟨a, ha1, ha2⟩ := mem
-  have mema : a ∈ R := le ha1
-  apply R.upper' ha2 mema
+  intro x ⟨a, ha1, ha2⟩
+  apply R.upper' ha2 (le ha1)
 
 theorem lowerClosure_eq_self_iff [PartialOrder P] (Q : Set P) :
     ↓ˢQ = Q ↔ IsLowerSet Q := by
@@ -921,12 +903,11 @@ theorem LowerSet.IsAntichain [PartialOrder P] {Q : Set P} (h : IsAntichain (· �
       ⟨s, by -- Must prove s is a lower set
         intro a b le mem
         rw [le_iff_lt_or_eq] at le
-        cases' le with lt eq
-        · exfalso;
-          have aq : ↑a ∈ Q := by simp
-          have bq : ↑b ∈ Q := by simp
-          apply IsAntichain.not_lt h bq aq lt
-        · rw [eq]; exact mem⟩
+        cases le with 
+        | inl lt =>
+          exfalso
+          apply IsAntichain.not_lt h (by simp) (by simp) lt
+        | inr eq => rw [eq]; exact mem⟩
     left_inv := λ a ↦ by simp; rfl
     right_inv := λ a ↦ by simp
     map_rel_iff' := by simp
@@ -1023,21 +1004,15 @@ theorem LowerSet.dual_orderIso [PartialOrder P] :
     𝒪(P)ᵒᵈ ≃o 𝒪(Pᵒᵈ) :=
   {
     toFun := λ s ↦
-      ⟨s.carrierᶜ, by
-        intro a b le memac memb
-        exact memac (s.lower' le memb)⟩
+      ⟨s.carrierᶜ, λ a b le memac memb ↦ memac (s.lower' le memb)⟩
     invFun := λ s ↦
-      ⟨s.carrierᶜ, by
-        intro a b le memac memb
-        exact memac (s.lower' le memb)⟩
-    left_inv := λ s ↦ by simp; rfl
-    right_inv := λ s ↦ by simp; rfl
+      ⟨s.carrierᶜ, λ a b le memac memb ↦ memac (s.lower' le memb)⟩
+    left_inv := λ s ↦ by simp only [carrier_eq_coe, _root_.compl_compl]; rfl
+    right_inv := λ s ↦ by simp only [carrier_eq_coe, _root_.compl_compl]; rfl
     map_rel_iff' := by
-      intro s t; --simp only [carrier_eq_coe, Equiv.coe_fn_mk]
+      intro ⟨s', _⟩ ⟨t', _⟩ 
       constructor <;> intro h
-      · intro _ mem;
-        obtain ⟨s', _⟩ := s
-        obtain ⟨t', _⟩ := t
+      · intro _ mem
         change s'ᶜ ⊆ t'ᶜ at h
         rw [Set.compl_subset_compl] at h
         exact h mem
@@ -1074,15 +1049,14 @@ def ψ [PartialOrder P] : WithTop (𝒪(P)) → 𝒪(WithTop P) :=
   λ
   | some s =>
     ⟨{ some x | x ∈ s }, by
-      intro c d le mem
-      obtain ⟨x, hx1, hx2⟩ := mem
+      intro c d le ⟨x, hx1, hx2⟩
       subst c
       use (WithTop.untop_le d le)
       have le' := le
       rw [←WithTop.coe_untop_le d le] at le'
       constructor
       · apply s.lower' (WithTop.coe_le_coe.1 le') hx1
-      · exact WithTop.coe_untop_le d le ⟩
+      · exact WithTop.coe_untop_le d le⟩
   | ⊤ => LowerSet.Iic ⊤
 
 lemma left_inv [PartialOrder P] :
@@ -1094,18 +1068,16 @@ lemma left_inv [PartialOrder P] :
   case a.h.h_1 t u heq
   · split_ifs at heq with h
     apply WithTop.coe_injective at heq
-    subst u; simp
+    subst u
     constructor <;> intro h1
     · obtain ⟨y, hy1, hy2⟩ := h1
       subst x; exact hy1
     · cases x with
-      | some x1 => use x1
+      | some x1 => use x1; simpa
       | none => exfalso; exact h h1
   case a.h.h_2 t heq
   · split_ifs at heq with h
-    constructor <;> intro _
-    · apply s.lower' (WithTop.le_none) h
-    · simp
+    simp; apply s.lower' (WithTop.le_none) h
 
 lemma right_inv [PartialOrder P] :
     Function.RightInverse ψ
@@ -1136,30 +1108,25 @@ lemma aux [PartialOrder P] {a : 𝒪(WithTop P)}
 
 lemma map_rel_iff [PartialOrder P] {a b : 𝒪(WithTop P)} :
     φ a ≤ φ b ↔ a ≤ b := by
-  simp
+  simp only [φ, LowerSet.carrier_eq_coe, SetLike.mem_coe]
   split_ifs with h1 h2 h2
-  · simp
+  · simp only [le_refl, true_iff]
     intro x _
     exact aux h2 x
-  · simp
+  · simp only [top_le_iff, false_iff]
     intro le
-    apply h2
-    change a ⊆ b at le
-    exact le ⊤ h1
-  · simp
+    apply h2 (le h1)
+  · simp only [le_top, true_iff]
     intro x _
     exact aux h2 x
-  · simp
+  · rw [WithTop.some_le_some]
     constructor <;> intro le
-    · intro y mem; simp at mem ⊢
+    · intro y mem
       cases y with
-      | some z =>
-        exact @le z mem
+      | some z => exact @le z mem
       | none => exfalso; exact h1 mem
     · intro y mem
-      simp at mem ⊢
-      change a ⊆ b at le
-      exact le _ mem
+      exact le mem
 
 noncomputable def Ch_1_32ia' [PartialOrder P] : OrderIso (𝒪(WithTop P)) (WithTop (𝒪(P))) :=
   {
@@ -1178,23 +1145,20 @@ namespace Ch_1_32_ib
 noncomputable def toFun [PartialOrder P] : 𝒪(WithBot P) → WithBot (𝒪(P)) :=
   λ | ⟨s, l⟩ =>
     if ⊥ ∈ s
-    then some ⟨{ x | some x ∈ s }, by
-      intro a b le mem
-      exact l (WithBot.coe_le_coe.2 le) mem ⟩
+    then some ⟨{ x | some x ∈ s }, λ _ _ le mem ↦ l (WithBot.coe_le_coe.2 le) mem⟩
     else ⊥
 
 @[simp]
 def invFun [PartialOrder P] : WithBot (LowerSet P) → LowerSet (WithBot P) :=
   λ
   | some s =>
-    ⟨{ some x | x ∈ s } ∪ {⊥}, by
-      intro c d le mem
+    ⟨{ some x | x ∈ s } ∪ {⊥}, λ c d le mem ↦ by
       cases mem with
       | inl mem =>
         obtain ⟨x, hx1, hx2⟩ := mem
         subst c
         cases d with
-        | none => right; simp; rw [WithBot.none_eq_bot]
+        | none => right; rw [WithBot.none_eq_bot]; simp
         | some d =>
           left; simp at le ⊢; exact s.lower' le hx1
       | inr mem => right; subst c; rw [←eq_bot_iff] at le; subst d; simp ⟩
@@ -1203,18 +1167,18 @@ def invFun [PartialOrder P] : WithBot (LowerSet P) → LowerSet (WithBot P) :=
 def left_inv [PartialOrder P] :
     Function.LeftInverse invFun
     (toFun : 𝒪(WithBot P) → WithBot (𝒪(P))) := by
-  intro s; simp; split_ifs with h
+  intro ⟨s', hs⟩; simp; split_ifs with h
   · split
     case pos.h_1 x t heq
     · simp_all
       obtain ⟨t', ht⟩ := t
-      obtain ⟨s', hs⟩ := s
-      simp at heq; subst t'; simp
+      simp only [LowerSet.mk.injEq] at heq 
+      subst t'
       ext y; constructor
-      · intro mem; simp at mem
+      · intro mem
         cases mem with
         | inl eq => subst eq; exact h
-        | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1
+        | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1 
       · intro mem
         cases y with
         | none => simp; rw [WithBot.none_eq_bot]
@@ -1225,10 +1189,9 @@ def left_inv [PartialOrder P] :
     case neg.h_1 x t heq
     · cases heq
     case neg.h_2 t _
-    · ext x; simp
+    · ext x; simp only [LowerSet.coe_mk, Set.mem_empty_iff_false, false_iff]
       intro xmem
-      apply h
-      apply s.lower' (OrderBot.bot_le x) xmem
+      exact h (hs (OrderBot.bot_le x) xmem)
 
 def right_inv [PartialOrder P] :
     Function.RightInverse invFun
@@ -1236,7 +1199,7 @@ def right_inv [PartialOrder P] :
   intro s; simp; split_ifs with h
   · split at h
     case pos.h_1 _ t s
-    · congr; simp
+    · congr
       ext x; simp
       constructor <;> intro mem
       · obtain ⟨x1, hx1, hx2⟩ := mem; simp at hx2;
@@ -1326,11 +1289,11 @@ theorem map_rel_iff' [PartialOrder P₁] [PartialOrder P₂] :
   · intro a amem
     obtain ⟨le1, le2⟩ := le
     cases a with
-    | inl a' => exact le1 amem
-    | inr a' => exact le2 amem
+    | inl _ => exact le1 amem
+    | inr _ => exact le2 amem
   · constructor
-    · intro a amem; exact le amem
-    · intro a amem; exact le amem
+    · intro _ amem; exact le amem
+    · intro _ amem; exact le amem
 
 theorem Ch_1_32_ii [PartialOrder P₁] [PartialOrder P₂] : 𝒪(P₁ ⊕ P₂) ≃o 𝒪(P₁) × 𝒪(P₂) :=
   {
@@ -1446,9 +1409,7 @@ lemma example_1_36_2 [PartialOrder P] [PartialOrder Q] (φ : P ↪o Q) :
   {
     toFun := λ p ↦ ⟨φ.toFun p, by simp⟩
     surj' := by
-      intro q
-      obtain ⟨q', hq⟩ := q
-      obtain ⟨p, hp⟩ := hq
+      intro ⟨q', ⟨p, hp⟩⟩
       use ⟨p, by simp⟩
       simp only [Set.coe_setOf, Set.mem_setOf_eq, Function.Embedding.toFun_eq_coe,
         RelEmbedding.coe_toEmbedding, Subtype.mk.injEq]
@@ -1540,7 +1501,6 @@ lemma example_1_37 [PartialOrder P] : (P →o Fin 2) ≃o 𝒪(P)ᵒᵈ :=
   {
     toFun := λ f ↦ ⟨{ p | f p = 0 }, by
       intro y x le mem
-      simp at mem ⊢
       apply f.monotone' at le; simp at le
       rw [mem] at le; simp at le; exact le ⟩ᵈ
     invFun := λ S ↦ ⟨λ p ↦ if p ∈ S then 0 else 1, by
@@ -1568,9 +1528,7 @@ lemma example_1_37 [PartialOrder P] : (P →o Fin 2) ≃o 𝒪(P)ᵒᵈ :=
           specialize le zero
           simp at le; rw [←le]; rfl
         | inr one => rw [one]; exact OrderTop.le_top (a x)
-      · simp
-        intro x xmem
-        simp at xmem ⊢
+      · intro x xmem
         specialize le x
         simp at le
         rw [xmem] at le
