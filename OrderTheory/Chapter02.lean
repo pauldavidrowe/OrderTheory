@@ -1,5 +1,6 @@
 import OrderTheory.Exercises01
 import Mathlib.Order.Sublattice
+import Mathlib.Order.Ideal
 
 open scoped Classical 
 
@@ -771,6 +772,8 @@ lemma exercise_2_15_a [Lattice L] [Lattice K] (l₀  : L) :
   }
 
 /-!
+  ## 2.16 Homomorphisms 
+  
   Lattice homomorphisms are maps that preserve sups and infs. It will be 
   important to understand how these maps relate to order preserving maps
   on the lattices viewed simply as partial orders. But first we have 
@@ -861,3 +864,588 @@ lemma example_2_17_1 [Lattice L] [Lattice K] (η : LatticeHom L K) (invFun : K �
   
   (ii) `f` is a lattice isomorphism if and only if it is an order isomorphism.
 -/
+
+lemma example_2_19_i_a_imp_b [Lattice L] [Lattice K] (f : L → K)
+    (mono : Monotone f) : ∀ a b : L, f a ⊔ f b ≤ f (a ⊔ b) := by 
+  intro a b 
+  have ale : f a ≤ f (a ⊔ b) := mono (le_sup_left : a ≤ a ⊔ b)
+  have ble : f b ≤ f (a ⊔ b) := mono (le_sup_right : b ≤ a ⊔ b)
+  exact sup_le_iff.mpr ⟨ale, ble⟩
+
+lemma example_2_19_i_a_imp_c [Lattice L] [Lattice K] (f : L → K)
+    (mono : Monotone f) : ∀ a b : L, f (a ⊓ b) ≤ f a ⊓ f b := by 
+  intro a b 
+  have lea : f (a ⊓ b) ≤ f a := mono (inf_le_left : a ⊓ b ≤ a)
+  have leb : f (a ⊓ b) ≤ f b := mono (inf_le_right : a ⊓ b ≤ b)
+  exact le_inf_iff.mpr ⟨lea, leb⟩
+  
+lemma example_2_19_i_b_imp_a [Lattice L] [Lattice K] (f : L → K) 
+    (h : ∀ a b, f a ⊔ f b ≤ f (a ⊔ b)) : Monotone f := by 
+  intro a b le
+  have bsup : a ⊔ b = b := sup_of_le_right le; rw[←bsup]
+  have le' : f a ≤ f a ⊔ f b := le_sup_left 
+  exact le_trans le' (h a b) 
+  
+lemma example_2_19_i_c_imp_a [Lattice L] [Lattice K] (f : L → K)
+    (h : ∀ a b, f (a ⊓ b) ≤ f a ⊓ f b) : Monotone f := by 
+  intro a b le
+  have ainf : a ⊓ b = a := inf_of_le_left le; rw [←ainf]
+  have le' : f a ⊓ f b ≤ f b := inf_le_right 
+  exact le_trans (h a b) le' 
+  
+lemma example_2_19_observation [Lattice L] [Lattice K] (f : LatticeHom L K) :
+    Monotone f := by apply example_2_19_i_b_imp_a; simp
+
+lemma example_2_19_ii [Nonempty L] [Lattice L] [Lattice K] (f : L → K) :
+    (Function.Bijective f ∧ ∃ h₁ : LatticeHom L K, h₁.toFun = f) ↔ 
+    ∃ h₂ : L ≃o K, h₂.toFun = f := by
+  constructor 
+  · intro ⟨bij, ⟨h₁, lhom⟩⟩
+    use { 
+      toFun := f 
+      invFun := Function.invFun f
+      left_inv := Function.leftInverse_invFun bij.1
+      right_inv := Function.rightInverse_invFun bij.2
+      map_rel_iff' := by
+        intro a b 
+        simp
+        constructor <;> intro le
+        · apply sup_of_le_right at le 
+          rw [←lhom, ←h₁.map_sup' a b] at le
+          suffices a ⊔ b = b by rw [←this]; exact le_sup_left 
+          rw [lhom] at le 
+          exact bij.1 le 
+        · have mono := example_2_19_observation h₁ 
+          rw [←lhom]
+          exact mono le }
+  · intro ⟨h₂, feq⟩
+    constructor 
+    · rw [←feq]
+      exact OrderIso.bijective h₂
+    · use {
+        toFun := f
+        map_sup' := by 
+          intro a b
+          subst f
+          simp
+        map_inf' := by
+          intro a b 
+          subst f 
+          simp
+      }
+
+/-! 
+  # Ideals and filters
+  
+  This section introduces lattice ideals and filters. Ideals form a central 
+  concept in algebra, and filters have a variety of applications in logic
+  and topology. Chapter 10 will focus on prime ideals, and this will form
+  the basis for the contents of Chapter 11. 
+-/
+
+/-!
+  ## 2.20 Definitions
+  
+  Let `L` be a lattice. A non-empty subset `J` of `L` is called an "ideal" if
+  and only if 
+  
+  (i) `∀ a b : L, a ∈ J → b ∈ J → a ⊔ b ∈ J`
+  
+  (ii) `∀ a b : L, b ∈ J → a ≤ b → a ∈ J`
+  
+  The above definition resembles the definition of an ideal in a ring. We could
+  state it more succinctly as a non-empty down-set `J` of a lattice that is closed 
+  under join. 
+  
+  Mathlib has `Order.Ideal P` which is a structure that bundles a `LowerSet P`
+  together with a proof that the set is "directed" (with respect to `≤`). 
+  This means that for any `a b ∈ J`, there is some `c ∈ J` such that `a ≤ c ∧ b ≤ c`. 
+  Being directed says nothing about closure under `⊔`, however, if `L` is a lattice
+  and `J : Order.Ideal L`, then it follows that `J` is closed under `⊔`.  
+-/
+
+/-- This is known in Mathlib as `Order.Ideal.sup_mem` -/
+lemma example_2_20_lattice_ideal [Lattice L] (J : Order.Ideal L) : 
+    ∀ a ∈ J, ∀ b ∈ J, a ⊔ b ∈ J := by
+  intro a amem b bmem 
+  obtain ⟨c, ⟨hc1, hc2, hc3⟩⟩ := J.directed' a amem b bmem
+  have sle : a ⊔ b ≤ c := sup_le_iff.mpr ⟨hc2, hc3⟩
+  exact J.lower sle hc1 
+
+/-!
+  The text says that every ideal of a lattice is a sublattice. 
+-/
+
+lemma example_2_20_ideal_toSublattice [Lattice L] (J : Order.Ideal L) : Sublattice L := 
+  {
+    carrier := J 
+    supClosed' := by 
+      intro a amem b bmem 
+      exact Order.Ideal.sup_mem amem bmem 
+    infClosed' := by 
+      intro a amem b _
+      exact J.lower' (inf_le_left) amem 
+  }
+
+/-!
+   A dual ideal is called a "filter". More concretely, a non-empty subset `G` 
+   of a Lattice `L` is called a filter if and only if 
+   
+   (i) `∀ a b : L, a ∈ G → b ∈ G → a ⊓ b ∈ G` 
+   
+   (ii) `∀ a b : L, b ∈ G → b ≤ a → a ∈ G` 
+   
+   In other words, a filter is a non-empty upper set, closed under `⊓`. 
+   
+   Mathlib calls a filter an `Order.PFilter`, and it is literally defined by 
+   specifying an `Order.Ideal` on `Lᵒᵈ`. 
+   
+   An ideal or filter is called "proper" if it is not equal to `L` itself. 
+   Mathlib has a type class for this called `Order.Ideal.IsProper J` which 
+   is a `Prop`. Oddly there is no corresponding definition for `Order.PFilter`. 
+   Perhaps we are typically meant to work with Ideals in partial orders, and 
+   when filters are used, we can just invoke the dual? 
+   
+   It is easy to show that, if a lattice has a `⊤`, then an ideal `J` is proper
+   if and only if `⊤ ∉ J`.  
+-/
+
+lemma example_2_20_withTop_ideal [Lattice L] [OrderTop L] (J : Order.Ideal L) : 
+    Order.Ideal.IsProper J ↔ ⊤ ∉ J := by 
+  constructor <;> intro h 
+  · intro mem
+    have allmem : ∀ x : L, x ∈ J := by 
+      intro x 
+      exact J.lower' (le_top (a := x)) mem 
+    apply h.ne_univ 
+    ext x 
+    constructor 
+    · simp
+    · intro _ 
+      exact allmem x 
+  · exact { 
+      ne_univ := by 
+        intro eq
+        apply h 
+        have := Set.mem_univ (⊤ : L) 
+        rw [←eq] at this 
+        exact this }
+
+/-! 
+  For each `a : L`, the set `↓ᵖa` is an ideal called the "principal ideal" generated
+  by `a`. Dually `↑ᵖa` is a principal filter. 
+-/
+
+lemma example_2_20_principal_ideal [Lattice L] (a : L) : Order.Ideal L := 
+  {
+    carrier := ↓ᵖa
+    lower' := (↓ᵖa).lower' 
+    nonempty' := by use a; simp 
+    directed' := by 
+      intro x xmem y ymem
+      use x ⊔ y
+      constructorm* _ ∧ _ 
+      · exact sup_le_iff.mpr ⟨xmem, ymem⟩ 
+      · exact le_sup_left 
+      · exact le_sup_right 
+  }
+
+/-!
+  ## 2.21 Examples 
+  
+  (1) In a finite lattice, every ideal or filter is principal. If `J` is an 
+  ideal, then `J = ↓ᵖ(sSup J)`. 
+-/
+
+/-- What an absolute mess of a proof! -/
+lemma example_2_21_1 [Fintype L] [Lattice L] (J : Order.Ideal L) (x : L) : 
+    ∃ s : L, x ∈ J ↔ x ∈ ↓ᵖs := by 
+  set J' := Set.toFinset J.carrier with hJ
+  have mem_iff : ∀ x, x ∈ J ↔ x ∈ J' := by 
+    intro x 
+    change x ∈ J.carrier ↔ x ∈ J' 
+    rw [←Set.mem_toFinset, ←hJ]
+  cases Finset.Nonempty.exists_eq_singleton_or_nontrivial (Set.toFinset_nonempty.mpr J.nonempty') with 
+  | inl h1 => 
+    obtain ⟨a, ha⟩ := h1 
+    use a 
+    constructor
+    · intro xmem
+      rw [mem_iff] at xmem
+      simp_all
+    · intro xmem
+      apply J.lower' at xmem
+      have : a ∈ ↑J := by 
+        rw [mem_iff, hJ, ha]; simp
+      exact xmem this       
+  | inr h1 => 
+    obtain ⟨a, ha⟩ := J.nonempty'
+    rw [←Set.mem_toFinset] at ha
+    set K := J'.erase a with hK 
+    have add : J' = insert a K := by 
+      have := (Finset.insert_erase ha).symm
+      rwa [hK]
+    have ne : (J'.erase a).Nonempty := Finset.Nontrivial.erase_nonempty h1
+    rw [←hK] at ne 
+    set b := Finset.sup' K ne id with hb 
+    use b ⊔ a 
+    constructor 
+    · intro xmem
+      by_cases xK : x ∈ K 
+      · have xle : x ≤ b := by
+          rw [hb]
+          exact Finset.le_sup' id xK 
+        apply le_trans xle le_sup_left 
+      · rw [mem_iff x] at xmem 
+        rw [hK] at xK 
+        have xeq : x = a := by 
+          rw [add] at xmem 
+          rw [Finset.mem_insert_coe] at xmem 
+          apply Set.eq_or_mem_of_mem_insert at xmem
+          cases xmem with 
+          | inl h => exact h 
+          | inr h => contradiction
+        subst x 
+        exact le_sup_right 
+    · intro xmem 
+      rw [mem_iff] 
+      have mem : b ∈ J := by 
+        apply Finset.sup'_mem
+        · intro y ymem z zmem
+          exact Order.Ideal.sup_mem ymem zmem 
+        · intro i imem 
+          rw [hK] at imem 
+          change i ∈ J; rw [mem_iff]
+          exact Finset.erase_subset a J' imem         
+      rw [Set.mem_toFinset] at ha 
+      change b ∈ J.carrier at mem 
+      have bamem := Order.Ideal.sup_mem mem ha 
+      apply J.lower xmem at bamem
+      rw [←mem_iff]
+      exact bamem 
+
+/-!
+  (2) Let `L` and `K` be bounded lattices and `f : L → K` a bounded lattice hom. 
+  Then `f⁻¹(0)` is an ideal and `f⁻¹(1)` is a filter in `L`. 
+-/
+
+lemma example_2_21_2a [Lattice L] [BoundedOrder L] [Lattice K] [BoundedOrder K] 
+    (f : BoundedLatticeHom L K) : Order.IsIdeal (f⁻¹' {⊥}) := 
+  {
+    IsLowerSet := by 
+      intro a b le amem 
+      simp_all
+      have mono : Monotone f := (BoundedLatticeHom.toBoundedOrderHom f).monotone'
+      apply_fun ⇑f at le using mono 
+      rw [amem] at le
+      exact le_bot_iff.mp le 
+    Nonempty := by 
+      use ⊥ 
+      rw [Set.mem_preimage]
+      simp
+    Directed := by 
+      intro a amem b bmem
+      simp at amem bmem 
+      use a ⊔ b 
+      constructorm* _ ∧ _ 
+      · simp; tauto
+      · simp
+      · simp
+  }
+
+/-! 
+  (3) The following are ideals in `Set X`: 
+  
+  (a) all subsets not containing a fixed element of `X` 
+  
+  (b) all finite subsets (this ideal is non-principal if `X` is infinite)
+-/
+
+lemma example_2_21_3a (x : X) : Order.IsIdeal { S : Set X | x ∉ S } := 
+  {
+    IsLowerSet := by
+      intro a b le amem xmem
+      exact amem (le xmem) 
+    Nonempty := by 
+      use ∅; simp 
+    Directed := by 
+      intro a amem b bmem
+      use a ∪ b 
+      simp_all
+  }
+
+lemma example_2_21_3b : Order.IsIdeal { S : Set X | Set.Finite S } := 
+  {
+    IsLowerSet := by 
+      intro a b le amem
+      exact Set.Finite.subset amem le
+    Nonempty := by use ∅; simp
+    Directed := by 
+      intro a amem b bmem
+      use a ∪ b 
+      simp_all
+  }
+  
+/-!
+  (4) I won't formalize this one because it's about topological spaces
+  and I don't really want to spend too much time learning the surrounding
+  API, even if it might be pretty easy. 
+-/
+
+/-!
+  # Complete lattices and ⋂-structures
+  
+  It's time to come back to complete lattices for which the join and
+  meet of arbitrary sets `S` exist. Recall that Mathlib denotes these
+  as `sSup` and `sInf`, and this is defined via a type class instance
+  of `SupSet` or `InfSet`. 
+  
+  ## 2.22 Lemma 
+  
+  Let `P` be an ordered set, let `S, T ⊆ P` and assume `sSup S`, `sSupT`,
+  `sInf S`, and `sInf T` exist in `P`. (We will just assume `P` is a
+  complete lattice instead, because it's a pain to make the right 
+  assumptions just for the given sets `S` and `T`, even though it's
+  more general.)
+  
+  (i) `∀ s ∈ S, s ≤ sSup S ∧ sInf S ≤ s`.
+-/
+
+lemma example_2_22_i [CompleteLattice P] (S : Set P) (s : P) (smem : s ∈ S) :
+    s ≤ sSup S ∧ sInf S ≤ s := ⟨le_sSup smem, sInf_le smem⟩ 
+
+/-!
+  (ii) Let `x : P`; then `x ≤ sInf S ↔ ∀ s ∈ S, x ≤ s`
+-/
+
+lemma example_2_22_ii [CompleteLattice P] (S : Set P) (x : P) : 
+    x ≤ sInf S ↔ ∀ s ∈ S, x ≤ s := by 
+  constructor 
+  · intro xle s smem
+    exact le_trans xle (sInf_le smem)
+  · intro h 
+    exact le_sInf h 
+
+/-!
+  (iii) Let `x : P`; then `sSup S ≤ x ↔ ∀ s ∈ S, s ≤ x`
+-/
+
+lemma example_2_22_iii [CompleteLattice P] (S : Set P) (x : P) : 
+    sSup S ≤ x ↔ ∀ s ∈ S, s ≤ x := by 
+  constructor 
+  · intro lex s smem 
+    exact le_trans (le_sSup smem) lex 
+  · intro h 
+    exact sSup_le h 
+
+/-! 
+  (iv) `sSup S ≤ sInf T ↔ ∀ s ∈ S, ∀ t ∈ T, s ≤ t`
+-/
+
+lemma example_2_22_iv [CompleteLattice P] (S T : Set P) : 
+    sSup S ≤ sInf T ↔ ∀ s ∈ S, ∀ t ∈ T, s ≤ t := by 
+  constructor 
+  · intro le s smem t tmem
+    apply le_trans _ (sInf_le tmem)
+    exact le_trans (le_sSup smem) le 
+  · intro h 
+    rw [example_2_22_iii]
+    intro s smem
+    rw [example_2_22_ii]
+    intro t tmem
+    exact h s smem t tmem 
+    
+/-!
+  (v) If `S ⊆ T`, then `sSup S ≤ sSup T` and `sInf T ≤ sInf S`
+-/
+
+lemma example_2_22_v [CompleteLattice P] (S T : Set P) (sub : S ⊆ T) :
+    sSup S ≤ sSup T ∧ sInf T ≤ sInf S := by 
+  constructor
+  · rw [example_2_22_iii]
+    intro s smem
+    specialize sub smem 
+    exact (example_2_22_i T s sub).1 
+  · rw [example_2_22_ii]
+    intro s smem
+    specialize sub smem 
+    exact (example_2_22_i T s sub).2 
+
+/-!
+  The join and meet behave well with respect to union. 
+  
+  ## 2.23 Lemma 
+  
+  Let `P` be a complete lattice and `S, T ⊆ P`. Then 
+  `sSup (S ∪ T) = (sSup S) ⊔ (sSup T)` and 
+  `sInf (S ∪ T) = (sInf S) ⊓ (sInf T)`
+-/
+
+lemma example_2_23a [CompleteLattice P] (S T : Set P) : 
+    sSup (S ∪ T) = (sSup S) ⊔ (sSup T) := by 
+  rw [←le_le_iff_eq]
+  constructor 
+  · rw [example_2_22_iii]
+    intro st stmem
+    cases stmem with 
+    | inl smem => exact le_trans (le_sSup smem) le_sup_left 
+    | inr tmem => exact le_trans (le_sSup tmem) le_sup_right 
+  · apply sup_le 
+    · exact (example_2_22_v _ _ (Set.subset_union_left S T)).1 
+    · exact (example_2_22_v _ _ (Set.subset_union_right S T)).1 
+
+lemma example_2_23b [CompleteLattice P] (S T : Set P) : 
+    sInf (S ∪ T) = (sInf S) ⊓ (sInf T) := by 
+  rw [←le_le_iff_eq] 
+  constructor 
+  · apply le_inf 
+    · exact (example_2_22_v _ _ (Set.subset_union_left S T)).2 
+    · exact (example_2_22_v _ _ (Set.subset_union_right S T)).2 
+  · rw [example_2_22_ii] 
+    intro st stmem 
+    cases stmem with 
+    | inl smem => exact le_trans inf_le_left (sInf_le smem)
+    | inr tmem => exact le_trans inf_le_right (sInf_le tmem) 
+
+/-!
+  ## 2.24 Lemma 
+  
+  Let `P` be a lattice. Then for every finite, nonempty set `F`, 
+  `sSup F` and `sInf F` are defined. 
+  
+  I'm not going to formalize this, because it doesn't play nice with 
+  the type classes in Mathlib. If I were to do it, I would define 
+  a new type class that defines functions `fSup : Finset P → P` and 
+  `fInf : Finset P → P`. The value of this is questionable, however. 
+  But perhaps I could instead define an instance of `SupSet P` given
+  `[Fintype P]` and `[SupSemilattice P]`? Yeah, that could work. 
+  
+  `TODO`: define an instance of `SupSet P` from `[SupSemilattice P]` 
+  and `[Fintype P]`
+  
+  ## 2.25 Corollary 
+  
+  Every finite lattice is complete. 
+  
+  If I had the above formalizations, I could then upgrade them into 
+  an instance of a `CompleteLattice`.
+  
+  `TODO`: define an instance of `CompleteLattice P` from `[Lattice P]`
+  and `[Fintype P]`. This might involve altering the above lemmas not 
+  to rely on `sSup` existing in general. 
+-/
+
+/-!
+  ## 2.26 Definition 
+  
+  Let `P` and `Q` be partially ordered sets, and `φ : P → Q` a map. 
+  Then we say that `φ` "preserves existing joins" if whenever 
+  `sSup S` exists in `P`, then `sSup (φ S)` exists in `Q` and 
+  `φ (sSup S) = sSup (φ S)`. The dual definition is obvious. 
+  
+  This is very similar to Mathlib's `sSupHom` that is a map `φ`together
+  with a proof that `∀ (s : Set P), φ (sSup s) = sSup (φ '' s)`. (Here 
+  `φ ''` extends `φ : P → Q` to a map `Set P → Set Q`.) The difference
+  is that in the text, `sSup` need not be defined on all sets. 
+  
+  In general, instead of `sSup`, I should just assert `x : P` such that
+  `IsLUB S x`, etc. 
+  
+  `TODO`: Figure out if I can better formalize some of the material in 
+  Chapter 2 to avoid the use of type classes when they are not warranted. 
+-/
+
+
+/-!
+  ## 2.27 Lemma 
+  
+  Let `P` and `Q` be ordered sets and `φ : P →o Q` be an order preserving
+  map. 
+  
+  (i) Assume that `S ⊆ P` is such that it has a LUB `pu` in `P` and 
+  `φ '' S` has a LUB `qu` in `Q`. Then `qu ≤ φ pu`. Dually, 
+  `φ pl ≤ ql` when the GLBs `pl` and `ql` exists for `S` and `φ '' S`
+  respectively. 
+-/
+
+lemma example_2_27_ia [PartialOrder P] [PartialOrder Q] (φ : P →o Q)
+    (S : Set P) {pu : P} {qu : Q} (plub : IsLUB S pu) (qlub : IsLUB (φ '' S) qu) :
+    qu ≤ φ pu := by 
+  rw [isLUB_le_iff qlub]
+  intro x xmem 
+  obtain ⟨y, hy1, hy2⟩ := xmem
+  subst x 
+  mono
+  exact plub.1 hy1 
+
+/-- Upgrade the above to complete lattices. -/
+lemma example_2_27_ia' [CompleteLattice P] [CompleteLattice Q] (φ : P →o Q)
+    (S : Set P) : sSup (φ '' S) ≤ φ (sSup S) :=  
+  example_2_27_ia φ S (isLUB_sSup S) (isLUB_sSup (φ '' S)) 
+
+lemma example_2_27_ib [PartialOrder P] [PartialOrder Q] (φ : P →o Q) 
+    (S : Set P) {pl : P} {ql : Q} (pglb : IsGLB S pl) (qglb : IsGLB (φ '' S) ql) : 
+    φ pl ≤ ql := by 
+  rw [le_isGLB_iff qglb]
+  intro x xmem 
+  obtain ⟨y, hy1, hy2⟩ := xmem 
+  subst x 
+  mono 
+  exact pglb.1 hy1 
+  
+lemma example_2_27_ib' [CompleteLattice P] [CompleteLattice Q] (φ : P →o Q)
+    (S : Set P) : φ (sInf S) ≤ sInf (φ '' S) := 
+  example_2_27_ib φ S (isGLB_sInf S) (isGLB_sInf (φ '' S)) 
+  
+/-!
+  (ii) Assume now that `φ : P ≃o Q` is an order-isomorphism. Then `φ`
+  preserves all existing joins and meets. 
+-/
+
+lemma example_2_27_iia [PartialOrder P] [PartialOrder Q] (φ : P ≃o Q) : 
+    ∀ S pu, IsLUB S pu → IsLUB (φ '' S) (φ pu) := by 
+  intro S pu plub 
+  constructor 
+  · intro x xmem 
+    obtain ⟨y, hy1, hy2⟩ := xmem; subst x 
+    apply φ.map_rel_iff'.mpr 
+    exact plub.1 hy1 
+  · intro x xmem
+    rw [←φ.right_inv x]
+    apply φ.map_rel_iff'.mpr 
+    rw [isLUB_le_iff plub]
+    intro y ymem
+    apply φ.map_rel_iff'.mp 
+    simp
+    have hy : φ y ∈ φ '' S := by simp_all 
+    exact xmem hy 
+
+lemma example_2_27_iia' [CompleteLattice P] [CompleteLattice Q] (φ : P ≃o Q) : 
+    ∀ S, φ (sSup S) = sSup (φ '' S) := by 
+  intro S 
+  have h := example_2_27_iia φ S (sSup S) (isLUB_sSup S)
+  apply (isLUB_iff_sSup_eq.mp h).symm 
+  
+lemma example_2_27_iib [PartialOrder P] [PartialOrder Q] (φ : P ≃o Q) :
+    ∀ S pl, IsGLB S pl → IsGLB (φ '' S) (φ pl) := by 
+  intro S pl pglb 
+  constructor 
+  · intro x xmem 
+    obtain ⟨y, hy1, hy2⟩ := xmem; subst x 
+    apply φ.map_rel_iff'.mpr 
+    exact pglb.1 hy1 
+  · intro x xmem 
+    rw [←φ.right_inv x] 
+    apply φ.map_rel_iff'.mpr
+    rw [le_isGLB_iff pglb]
+    intro y ymem 
+    apply φ.map_rel_iff'.mp 
+    simp 
+    have hy : φ y ∈ φ '' S := by simp_all 
+    exact xmem hy 
+    
+lemma example_2_27_iib' [CompleteLattice P] [CompleteLattice Q] (φ : P ≃o Q) :
+    ∀ S, φ (sInf S) = sInf (φ '' S) := by 
+  intro S 
+  have h := example_2_27_iib φ S (sInf S) (isGLB_sInf S)
+  apply (isGLB_iff_sInf_eq.mp h).symm 
