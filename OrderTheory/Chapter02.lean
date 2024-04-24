@@ -4,6 +4,7 @@ import Mathlib.Order.Ideal
 
 open scoped Classical 
 
+variable {P Q ι X L K : Type}
 /-!
   # Chapter 2: Lattices and Complete Lattices
   
@@ -336,14 +337,14 @@ lemma example_2_6_3c [PartialOrder P]
     exact h i le mem   
   
 @[simp]  
-local instance instOrderTop : OrderTop (WithTop (WithBot (Fin' n))) := 
+local instance instOrderTop {n : ℕ} : OrderTop (WithTop (WithBot (Fin' n))) := 
   {
     top := none 
     le_top := by simp
   }
   
 @[simp]
-local instance instOrderBot : OrderBot (WithTop (WithBot (Fin' n))) := 
+local instance instOrderBot {n : ℕ} : OrderBot (WithTop (WithBot (Fin' n))) := 
   { 
     bot := some none 
     bot_le := by
@@ -355,7 +356,7 @@ local instance instOrderBot : OrderBot (WithTop (WithBot (Fin' n))) :=
     
 @[simp]
 noncomputable
-instance instrSup : Sup (WithTop (WithBot (Fin' n))) := 
+instance instrSup {n : ℕ} : Sup (WithTop (WithBot (Fin' n))) := 
   {
     sup := λ 
       | ⊥, y => y 
@@ -365,7 +366,7 @@ instance instrSup : Sup (WithTop (WithBot (Fin' n))) :=
 
 @[simp]
 noncomputable
-local instance instInf : Inf (WithTop (WithBot (Fin' n))) :=
+local instance instInf {n : ℕ} : Inf (WithTop (WithBot (Fin' n))) :=
   {
     inf := λ
       | x, ⊤ => x
@@ -374,7 +375,8 @@ local instance instInf : Inf (WithTop (WithBot (Fin' n))) :=
   }
 
 noncomputable 
-local instance instrSemilatticeSup {n : Nat} : SemilatticeSup (WithTop (WithBot (Fin' n))) := 
+local instance instrSemilatticeSup {n : Nat} : 
+    SemilatticeSup (WithTop (WithBot (Fin' n))) := 
   {
     le_sup_left := by
       intro x y 
@@ -634,7 +636,7 @@ instance LNat.instSuplocal : Sup LNat := { sup := Nat.lcm }
 @[simp]
 instance LNat.instInflocal : Inf LNat := { inf := Nat.gcd }
 
-instance LNat.instCCMWZ : CancelCommMonoidWithZero LNat := Nat.cancelCommMonoidWithZero
+instance LNat.instCCMWZ : CancelCommMonoidWithZero LNat := Nat.instCancelCommMonoidWithZero
 instance LNat.instNGCDM : NormalizedGCDMonoid LNat := by
   haveI I : NormalizedGCDMonoid Nat := by infer_instance
   exact I 
@@ -687,7 +689,7 @@ end section
   (1) Any one-element subset of a lattice is a sublattice. 
 -/
 
-def example_2_14a [Lattice α] (x : α) : Sublattice α := 
+def example_2_14a [Lattice L] (x : L) : Sublattice L := 
   {
     carrier := {x}
     supClosed' := by 
@@ -706,10 +708,10 @@ def example_2_14a [Lattice α] (x : α) : Sublattice α :=
   More generally, any non-empty chain in a lattice is a sublattice.
 -/
   
-def example_2_14b [Lattice α] {L : Set α} (h : IsChain_le L) : 
-    Sublattice α := 
+def example_2_14b [Lattice L] {K : Set L} (h : IsChain_le K) : 
+    Sublattice L := 
   {
-    carrier := L
+    carrier := K
     supClosed' := by 
       intro a mema b memb        
       by_cases eq : a = b 
@@ -1449,3 +1451,252 @@ lemma example_2_27_iib' [CompleteLattice P] [CompleteLattice Q] (φ : P ≃o Q) 
   intro S 
   have h := example_2_27_iib φ S (sInf S) (isGLB_sInf S)
   apply (isGLB_iff_sInf_eq.mp h).symm 
+  
+/-!
+  ## 2.28 Lemma 
+  
+  Let `Q` be a subset, with the induced order, of some ordered set `P`, and
+  let `S ⊆ Q`. If `S` has a least upper bound `p` in `P`, then `p ∈ Q` and 
+  `p` is the least upper bound in `Q`. 
+-/
+  
+lemma example_2_28a [PartialOrder P] (Q : Set P) (S : Set Q) 
+    (p : P) (h : IsLUB (S : Set P) p) (mem : p ∈ Q) : 
+    IsLUB S (⟨p, mem⟩ : Q) := by 
+  constructor 
+  · intro s smem
+    apply Subtype.mk_le_mk.mpr 
+    exact h.1 (Set.mem_image_of_mem _ smem)
+  · intro q qmem
+    apply Subtype.mk_le_mk.mpr 
+    apply h.2 
+    intro x hx
+    rw [Set.mem_image] at hx 
+    obtain ⟨x', mem', hx'⟩ := hx 
+    subst x 
+    apply qmem mem' 
+
+lemma example_2_28b [PartialOrder P] (Q : Set P) (S : Set Q) 
+    (p : P) (h : IsGLB (S : Set P) p) (mem : p ∈ Q) :
+    IsGLB S (⟨p, mem⟩ : Q) := @example_2_28a Pᵒᵈ _ _ _ _ (IsGLB.dual h) _
+
+/-!
+  ## 2.29 Corollary 
+  
+  Let `𝔏` be a family of subsets of a set `X` and let `{A i | i : ι}` be 
+  a subset of `𝔏`. 
+  
+  (i) If `⋃ (i : I), A i ∈ 𝔏`, then it is the least upper bound of the
+  family of sets. 
+-/
+
+lemma example_2_29_i (𝔏 : Set (Set X)) (A : ι → Set X) 
+    (sub : {A i | i : ι} ⊆ 𝔏) (union : ⋃ (i : ι), A i ∈ 𝔏) : 
+    @IsLUB 𝔏 _ { A i | i : ι } ⟨(⋃ (i : ι), A i), union⟩ := by 
+  apply example_2_28a 
+  constructor
+  · intro S Smem y ymem
+    simp at Smem 
+    obtain ⟨i, eq⟩ := Smem.1
+    rw [Set.mem_iUnion]
+    use i; subst S 
+    exact ymem 
+  · intro S Smem x xmem
+    simp [upperBounds] at Smem 
+    rw [Set.mem_iUnion] at xmem 
+    obtain ⟨i, xmem⟩ := xmem 
+    apply Smem i _ xmem 
+    apply sub 
+    simp
+  
+/-!
+  (ii) If `⋂ (i : ι), {A i | i : ι} ∈ 𝔏` then it is the greatest lower
+  bound of the family of sets. 
+-/
+
+lemma example_2_29_ii (𝔏 : Set (Set X)) (A : ι → Set X) 
+    (sub : {A i | i : ι} ⊆ 𝔏) (inter : ⋂ (i : ι), A i ∈ 𝔏) : 
+    @IsGLB 𝔏 _ { A i | i : ι } ⟨(⋂ (i : ι), A i), inter⟩ := by
+  apply example_2_28b 
+  constructor
+  · intro S Smem x xmem
+    simp [upperBounds] at Smem 
+    rw [Set.mem_iInter] at xmem 
+    obtain ⟨i, eq⟩ := Smem.1; subst S 
+    exact xmem i 
+  · intro S Smem y ymem
+    rw [Set.mem_iInter]
+    intro i
+    apply Smem _ ymem 
+    simp
+    apply sub 
+    simp
+
+/-!
+  ## 2.30 Lemma 
+  
+  Let `P` be an ordered set with `sInf` defined for every nonempty 
+  subset of `P`. (I.e., every nonempty subset has a GLB.) Then 
+  `sSup` is defined for every subset `S` of `P` that has an upper
+  bound in `P`. (In fact, sSup S = sInf (Sᵘ))
+-/
+
+lemma example_2_30 [PartialOrder P] 
+    (infs : Π S : Set P, S.Nonempty → { x // IsGLB S x }) : 
+    Π (S : Set P), (Sᵘ).Nonempty → { y // IsLUB S y } := by 
+  intro S ne 
+  obtain ⟨x, hx1, hx2⟩ := infs Sᵘ ne
+  use x 
+  constructor
+  . intro p pmem 
+    exact hx2 (λ a a ↦ a pmem) 
+  · exact hx1 
+
+/-!
+  ## 2.31 Theorem 
+  
+  Let `P` be a non-empty ordered set. Then the following are equivalent. 
+  
+  (i) `P` is a complete lattice 
+  
+  (ii) `sInf` exists in `P` for every subset `S` of `P` 
+  
+  (iii) `P` has a top element `⊤`, and `sInf` exists in `P` for 
+  every non-empty subset `S` of `P`. 
+-/
+
+def example_2_31_i_ii (_ : CompleteLattice P) : 
+    Π (S : Set P), { x // IsGLB S x } := λ S ↦ ⟨sInf S, isGLB_sInf S⟩
+    
+/- lemma example_2_31_i_ii (h : CompleteLattice P) : ∀ S : Set P, 
+    ∃ x, IsGLB S x := by 
+  intro S 
+  use (sInf S)
+  exact isGLB_sInf S  -/
+
+def example_2_31_ii_iiia [PartialOrder P] 
+    (h : Π (S : Set P), {x // IsGLB S x}) : OrderTop P := 
+  {
+    top := (h ∅).val 
+    le_top := by 
+      intro a 
+      have h2 := (h ∅).property 
+      simp at h2 
+      apply h2 
+  }
+
+def example_2_31_ii_iiib [PartialOrder P]
+    (h : Π (S : Set P), {x // IsGLB S x}) : 
+    Π (S : Set P), S.Nonempty → {x // IsGLB S x} := λ S _ ↦ h S
+    
+/- lemma example_2_31_ii_iii' [PartialOrder P] (h : ∀ S : Set P, ∃ x, IsGLB S x) :
+    (∃ _ : OrderTop P, true) ∧ ∀ S : Set P, S.Nonempty → ∃ x, IsGLB S x := by
+  constructor
+  · obtain ⟨x, hx⟩ := h ∅
+    use {
+      top := x 
+      le_top := by 
+        intro a 
+        obtain ⟨_, hx2⟩ := hx 
+        simp at hx2
+        apply hx2 
+        simp
+    }
+  · intro S _  
+    exact h S  -/
+    
+lemma example_2_31_ii_i [PartialOrder P] 
+    (h : Π S : Set P, {x // IsGLB S x}) : CompleteLattice P :=
+  have h' := example_2_31_ii_iiib h 
+  haveI : OrderTop P := example_2_31_ii_iiia h 
+  have supne : ∀ S : Set P, (Sᵘ).Nonempty := by 
+    intro S
+    use ⊤ 
+    intro a _
+    exact le_top 
+  {
+    inf := λ a b ↦ h (Set.insert a {b})
+    sup := λ a b ↦ example_2_30 h' ({a, b}) (supne {a, b})
+    inf_le_left := by 
+      intro a b 
+      have h1 := (h (Set.insert a {b})).property 
+      apply h1.1 
+      exact Set.mem_insert a {b} 
+    inf_le_right := by 
+      intro a b 
+      have h1 := (h (Set.insert a {b})).property 
+      apply h1.1 
+      apply Set.mem_insert_of_mem 
+      simp 
+    le_sup_left := by 
+      intro a b 
+      have h1 := (example_2_30 h' (Set.insert a {b}) (supne {a, b})).property 
+      apply h1.1
+      exact Set.mem_insert a {b} 
+    le_sup_right := by 
+      intro a b 
+      have h1 := (example_2_30 h' (Set.insert a {b}) (supne {a, b})).property 
+      apply h1.1
+      apply Set.mem_insert_of_mem
+      simp
+    sup_le := by 
+      intro a b c ac bc
+      have h1 := (example_2_30 h' (Set.insert a {b}) (supne {a, b})).property 
+      apply h1.2
+      intro x hx
+      cases hx <;> subst x <;> assumption 
+    le_inf := by 
+      intro c a b ca cb 
+      have h1 := (h (Set.insert a {b})).property 
+      apply h1.2 
+      intro x hx 
+      cases hx <;> subst x <;> assumption 
+    sInf := λ S ↦ h S
+    sSup := λ S ↦ example_2_30 h' S (supne S) 
+    sInf_le := by 
+      intro S a amem 
+      have h1 := (h S).property 
+      simp
+      exact h1.1 amem 
+    le_sInf := by 
+      intro S a ble
+      have h1 := (h S).property 
+      simp
+      apply h1.2
+      exact ble 
+    le_sSup := by 
+      intro S a amem 
+      have h1 := (example_2_30 h' S (supne S)).property 
+      simp
+      exact h1.1 amem
+    sSup_le := by 
+      intro S a ble 
+      have h1 := (example_2_30 h' S (supne S)).property 
+      simp
+      apply h1.2
+      exact ble 
+    bot := example_2_30 h' ∅ (supne ∅)
+    le_top := this.le_top 
+    bot_le := by 
+      intro x
+      have h1 := (example_2_30 h' ∅ (supne ∅)).property 
+      simp 
+      apply h1.2
+      simp    
+  }
+  
+lemma example_2_31_iii_ii [PartialOrder P] [ot : OrderTop P] 
+    (h : Π S : Set P, S.Nonempty → { x // IsGLB S x }) :
+    Π S : Set P, { x // IsGLB S x } := λ S ↦ by 
+  by_cases ne : S.Nonempty 
+  · exact h S ne 
+  · rw [Set.nonempty_iff_ne_empty] at ne 
+    simp at ne 
+    subst S 
+    have : IsGLB ∅ ⊤ := by 
+      constructor
+      · simp
+      · simp
+        intro x _ 
+        exact ot.le_top x 
+    exact ⟨⊤, this⟩

@@ -2,6 +2,8 @@ import OrderTheory.Chapter01
 
 open scoped Classical
 
+variable {P Q : Type}
+--universe u v
 /-!
   # Exercises for Chapter 1
 
@@ -26,7 +28,7 @@ open scoped Classical
 -/
 
 /-- A class defining trees as in the text. -/
-class OrderTree (P : Type u) [PartialOrder P] [OrderBot P] : Type v where
+class OrderTree (P : Type) [PartialOrder P] [OrderBot P] : Type where
   tree' : (∀ x : P, IsChain_le (↓ᵖx).carrier)
 
 lemma exercise_1_5 : OrderTree (List (Fin 2)) :=
@@ -74,25 +76,25 @@ lemma exercise_1_5 : OrderTree (List (Fin 2)) :=
 -/
 namespace Ex_1_6
 
-def P := List (Fin 2)
+def P' := List (Fin 2)
 
-local instance instBinStringLE : LE P :=
+local instance instBinStringLE : LE P' :=
 {
   le := λ u v ↦ (v <+: u) ∨
   (∃ x, x ++ [0] <+: v ∧ x ++ [1] <+: u)
 }
 
-local instance instBinStringLT : LT P :=
+local instance instBinStringLT : LT P' :=
   {
     lt := λ u v ↦ instBinStringLE.le u v ∧ ¬instBinStringLE.le v u
   }
 
 
 
-lemma le_refl : ∀ a : P, a ≤ a := by
+lemma le_refl : ∀ a : P', a ≤ a := by
   intro a; left; apply List.prefix_rfl
 
-lemma le_trans : ∀ a b c : P, a ≤ b → b ≤ c → a ≤ c := by
+lemma le_trans : ∀ a b c : P', a ≤ b → b ≤ c → a ≤ c := by
   intro a b c leab lebc
   simp [instBinStringLE] at leab lebc
   cases leab with
@@ -175,7 +177,7 @@ lemma le_trans : ∀ a b c : P, a ≤ b → b ≤ c → a ≤ c := by
           · use t ++ [0] ++ y2; simp
           · use z1
 
-lemma le_antisymm : ∀ a b : P, a ≤ b → b ≤ a → a = b := by
+lemma le_antisymm : ∀ a b : P', a ≤ b → b ≤ a → a = b := by
   intro a b le1 le2
   cases le1 with
   | inl le1 => cases le2 with
@@ -238,7 +240,7 @@ lemma le_antisymm : ∀ a b : P, a ≤ b → b ≤ a → a = b := by
           obtain ⟨s, hs⟩ := hv
           rw [hs.1] at hu; simp at hu
 
-lemma le_total : ∀ a b : P, a ≤ b ∨ b ≤ a := by
+lemma le_total : ∀ a b : P', a ≤ b ∨ b ≤ a := by
   intro a
   induction a using List.list_reverse_induction with
   | base =>
@@ -284,7 +286,7 @@ lemma le_total : ∀ a b : P, a ≤ b ∨ b ≤ a := by
         · apply List.prefix_append_of_prefix hu1
         · exact hu2
 
-noncomputable def instBinStringLinearOrder : LinearOrder P :=
+noncomputable def instBinStringLinearOrder : LinearOrder P' :=
   {
     le := instBinStringLE.le
     lt := instBinStringLT.lt
@@ -301,7 +303,7 @@ noncomputable def instBinStringLinearOrder : LinearOrder P :=
       | x, y => id inferInstance
   }
 
-def instBinStringOrderTop : OrderTop P :=
+def instBinStringOrderTop : OrderTop P' :=
   {
     top := []
     le_top := λ a ↦ by left; use a; simp
@@ -448,7 +450,7 @@ lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
         | inl eq => subst c; contradiction
         | inr cmem => exact cmem 
 
-lemma funPO [PartialOrder Y] {f g : X → Y} : 
+lemma funPO {X Y : Type} [PartialOrder Y] {f g : X → Y} : 
     f < g ↔ f ≤ g ∧ ∃ x, f x < g x := by 
   constructor
   · intro ⟨le, nle⟩
@@ -467,7 +469,7 @@ lemma funPO [PartialOrder Y] {f g : X → Y} :
     rw [lt_iff_le_not_le] at lt
     exact lt.2 le' 
 
-lemma exercise_1_27a [PartialOrder Y] (f g : X → Y) : 
+lemma exercise_1_27a {X Y : Type} [PartialOrder Y] (f g : X → Y) : 
     f ⋖ g ↔ ∃ x₀ : X, (∀ x, x ≠ x₀ → f x = g x) ∧ (f x₀ ⋖ g x₀) := by
   constructor 
   · intro ⟨lt, fg⟩

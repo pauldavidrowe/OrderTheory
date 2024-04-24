@@ -9,6 +9,8 @@ import Mathlib.Tactic
 
 import Std.Data.List.Lemmas
 
+variable {α : Type} {P Q : Type}
+
 def WithTop.untop_le [PartialOrder α] {y : α} (x : WithTop α) : x ≤ some y → α :=
   match x with
   | some a => λ _ ↦ a
@@ -145,7 +147,7 @@ lemma List.prefix_append_of_prefix {l1 l2 l3 : List α} (h : l1 <+: l2) : l1 <+:
   rw [←hu]
   simp
 
-lemma List.prefix_of_ne_concat (h : l1 ≠ l2 ++ [a]) (h2 : l1 <+: l2 ++ [a]) : l1 <+: l2 := by
+lemma List.prefix_of_ne_concat {l1 l2 : List α} {a : α} (h : l1 ≠ l2 ++ [a]) (h2 : l1 <+: l2 ++ [a]) : l1 <+: l2 := by
   obtain ⟨u, hu⟩ := h2
   by_cases mt : u = []
   · subst u; simp at hu; contradiction

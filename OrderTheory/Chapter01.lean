@@ -52,6 +52,8 @@ open scoped Classical
   The primary thing to specify for a Partial Order is the `≤` relation. Lean automatically
   infers the strict order `<` according the usual rule: `x < y ↔ x ≤ y ∧ x ≠ y`.
 -/
+variable {P Q R S α X Y P₁ P₂ : Type} 
+universe u v 
 
 /-!
   ## 1.3 Chains and Antichains
@@ -267,7 +269,7 @@ def instNatDivPartialOrder : PartialOrder ℕ :=
 
 theorem List.IsPrefix.refl (a : List α) : a <+: a := by use []; simp
 
-theorem List.IsPrefix.antisymm : a <+: b → b <+: a → a = b := by
+theorem List.IsPrefix.antisymm {a b : List α}: a <+: b → b <+: a → a = b := by
   intro h1 h2
   obtain ⟨a1, h1⟩ := h1
   obtain ⟨b1, h2⟩ := h2
@@ -342,7 +344,7 @@ theorem Function.Option.le_antisymm {a b : X → Option Y} (h1 : a ≤ b) (h2 : 
       specialize h' y
       tauto
 
-instance Function.Option.instPartialOrder {X : Type u} {Y : Type v} :
+instance Function.Option.instPartialOrder : 
     PartialOrder (X → Option Y) :=
   {
     le := LE.le
@@ -758,6 +760,8 @@ theorem Function.Option.isMax_isSome {f : X → Option Y} (hf : ∀ x, (f x).isS
 
 section Ch_1_26
 
+variable {n : ℕ}
+
 /-- Definition of forward function defining the `OrderIso` for 1.26 -/
 def f {n : ℕ} (A : Set (Fin n)) : Fin n → Prop := λ i ↦ i ∈ A
 
@@ -778,6 +782,7 @@ def φ : OrderIso (Set (Fin n)) (Fin n → Prop) := {
     unfold f
     simp [LE.le]
 }
+
 
 /--
   An alternative approach that shows φ is a `OrderIso'`
@@ -1229,7 +1234,7 @@ def map_rel_iff' [PartialOrder P] :
   · simp; intro a amem; exfalso; apply h1; apply x.lower' (OrderBot.bot_le a) amem
   · simp; intro a amem; exfalso; apply h1; apply x.lower' (OrderBot.bot_le a) amem
 
-noncomputable def Ch_1_32_ib [PartialOrder P] : 𝒪(WithBot P) ≃o WithBot (𝒪(P)) :=
+noncomputable def Ch_1_32_ib' [PartialOrder P] : 𝒪(WithBot P) ≃o WithBot (𝒪(P)) :=
   {
     toFun := toFun
     invFun := invFun
@@ -1295,7 +1300,7 @@ theorem map_rel_iff' [PartialOrder P₁] [PartialOrder P₂] :
     · intro _ amem; exact le amem
     · intro _ amem; exact le amem
 
-theorem Ch_1_32_ii [PartialOrder P₁] [PartialOrder P₂] : 𝒪(P₁ ⊕ P₂) ≃o 𝒪(P₁) × 𝒪(P₂) :=
+theorem Ch_1_32_ii' [PartialOrder P₁] [PartialOrder P₂] : 𝒪(P₁ ⊕ P₂) ≃o 𝒪(P₁) × 𝒪(P₂) :=
   {
     toFun := toFun
     invFun := invFun
