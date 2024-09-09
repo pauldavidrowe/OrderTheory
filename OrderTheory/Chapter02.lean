@@ -1,6 +1,9 @@
 import OrderTheory.Exercises01
 import Mathlib.Order.Sublattice
 import Mathlib.Order.Ideal
+import Mathlib.Data.Set.Card
+import Mathlib.Order.Height
+import Mathlib.Order.RelClasses
 
 open scoped Classical 
 
@@ -72,20 +75,16 @@ theorem exists_LUB_iff [PartialOrder P] (S : Set P) :
     use x 
     intro y 
     constructor
-    · intro h 
-      exact lub.2 h 
-    · intro le s mem
-      exact (lub.1 mem).trans le 
+    · exact λ h ↦ lub.2 h 
+    · exact λ le _ mem ↦ (lub.1 mem).trans le 
   · intro ⟨x, h⟩
     use x 
     constructor
     · intro s mem
       specialize h x 
-      simp at h 
+      simp only [le_refl, iff_true] at h 
       exact h s mem
-    · intro y mem
-      specialize h y 
-      exact h.mp mem 
+    · exact λ y mem ↦ (h y).mp mem 
 
 /-!
   Of course the greatest lower bound works dually. It is denoted `IsGLB S x` in Mathlib.
@@ -1700,3 +1699,465 @@ lemma example_2_31_iii_ii [PartialOrder P] [ot : OrderTop P]
         intro x _ 
         exact ot.le_top x 
     exact ⟨⊤, this⟩
+
+lemma example_2_31_iii_i [PartialOrder P] [ot : OrderTop P]
+  (h : Π S : Set P, S.Nonempty → { x // IsGLB S x }) :
+  CompleteLattice P := by 
+  have h' := example_2_31_iii_ii h 
+  exact example_2_31_ii_i h' 
+
+/-!
+  ## 2.32 Corollary 
+  
+  Let `X` be a set and let `𝔏` be a family of subsets ordered by inclusion
+  such that 
+  
+  (a) `∀ ι (A : ι → Set X), { A i | i : ι} ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏`
+  
+  (b) `X ∈ 𝔏`.
+  
+  Then 𝔏 is a complete lattice in which `⨅ (i : ι), A i = ⋂ (i : ι), A i` 
+  and `⨆ (i : ι), A i = ⋃₀ { B ∈ 𝔏 | ⋃ (i : ι), A i ⊆ B}`
+-/
+
+lemma example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
+    (h2 : ∀ (ι : Type 0) (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏) : 
+    CompleteLattice 𝔏 := by 
+  have ot : OrderTop 𝔏 := 
+    {
+      top := ⟨(Set.univ : Set X), h1⟩
+      le_top := by 
+        intro a x _; simp
+    }
+  have h3 : Π S : Set 𝔏, S.Nonempty → { x // IsGLB S x } := by 
+    intro S _ 
+    set A : S → Set X := λ X ↦ X.val with hA
+    have HA : ∀ S, A ↑S = ↑↑S := by 
+      intro S1 
+      rw [hA]
+    have sub : { A i | i : S } ⊆ 𝔏 := by
+      intro x ⟨i, hi⟩; subst x 
+      rw [hA]; simp
+    have g := h2 ↥S A sub 
+    refine' ⟨⟨⋂ (i : S), A i, g⟩, _⟩
+    constructor 
+    · intro x xmem y ymem 
+      simp at ymem ⊢
+      set x' : S := ⟨x, xmem⟩ with Hx'
+      have hx' := HA x' 
+      specialize ymem ↑↑x' (Subtype.mem x) xmem 
+      rw [hx', Hx'] at ymem 
+      exact ymem 
+    · intro x xmem y ymem i imem
+      obtain ⟨a, b, ha⟩ := imem 
+      beta_reduce
+      have ha := Subtype.mem a
+      specialize xmem ha 
+      specialize xmem ymem 
+      rw [HA a]
+      exact xmem       
+  exact example_2_31_iii_i h3  
+
+/-!
+  ## 2.33 Definitions 
+  
+  If `𝔏` is a non-empty family of subsets of `X` which satisfies condition (a) of 
+  `example_2_32` (i.e., `h2` in the lemma statement), then `𝔏` is called an 
+  "intersection structure". If `𝔏` also satisfies (b) (i.e., `h1`) then it is 
+  called a "topped intersection structure". 
+  
+  Mathlib does not seem to have classes for these concepts. It would be instructive
+  to make some here, since the text is likely to return to them frequently enough.
+  I will probably not build a robust API around them, however, unless that becomes
+  more obviously helpful. 
+-/  
+
+class InterStructure (𝔏 : Set (Set X)) where 
+  ne : 𝔏.Nonempty 
+  inter : ∀ (ι : Type 0) (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏
+  
+class ToppedInterStructure (𝔏 : Set (Set X)) extends InterStructure 𝔏 where
+  univ_mem : (Set.univ : Set X) ∈ 𝔏
+
+/-!
+  Just to test that these classes are working ok, I will prove 2.32 again for 
+  `ToppedInterStructure`s. 
+-/  
+
+lemma example_2_33 {𝔏 : Set (Set X)} [Inst : ToppedInterStructure 𝔏] : CompleteLattice 𝔏 :=
+  example_2_32 𝔏 Inst.univ_mem Inst.inter 
+  
+/-!
+  ## 2.34 Examples 
+  
+  (1) Consider `X → Option Y` where we assume `X.Nonempty` and `Y.nonempty`. From observations
+  in 1.10, the map `λ π ↦ graph π` is an order-embedding of `X → Option Y` into `Set (X × Y)`. 
+  Let `𝔏` be the family of subsets of `X × Y` which are graphs of partial maps. To prove that
+  `𝔏` is cloased under intersections, use the characterization given in 1.10: if
+  `S ⊆ X × Y`, then `S ∈ 𝔏` if and only if `(s, y) ∈ S` and `(s, y') ∈ S` imply `y = y'`. 
+  So we can make `𝔏` a (topless) InterStructure. If `∣Y∣ = 1` it is actually topped. 
+-/
+@[simp]
+def graph {Y : Type} (f : X → Option Y) : Set (X × Y) := { (x, y) | f x = some y }
+
+def example_2_34_1b {Y : Type} : (X → Option Y) ↪o Set (X × Y) := 
+  {
+    toFun := λ π ↦ graph π
+    inj' := by 
+      intro f g eq 
+      ext x y 
+      constructor <;> intro mem 
+      · have xymemf : (x, y) ∈ graph f := by simpa 
+        simp_all 
+      · have xymemf : (x, y) ∈ graph f := by simp_all 
+        simp at xymemf; assumption 
+    map_rel_iff' := by 
+      intro f g  
+      constructor <;> intro le 
+      · simp at le 
+        intro x eq 
+        rw [Option.isSome_iff_exists] at eq 
+        obtain ⟨y, hy⟩ := eq 
+        specialize le x y hy 
+        rw [hy, le]
+      · intro xy xymem 
+        simp_all
+        have is : Option.isSome (f xy.1) = true := by 
+          rw [Option.isSome_iff_exists]
+          use xy.2 
+        specialize @le xy.1 is 
+        rw [← le]; assumption 
+  }
+
+lemma example_2_34_1c {Y : Type} (S : Set (X × Y)) :
+    (∀ x y y', (x, y) ∈ S → (x, y') ∈ S → y = y') ↔ ∃ π : X → Option Y, S = graph π := by 
+  constructor 
+  · intro h 
+    use λ x ↦ if ∃ s ∈ S, s.1 = x then s.2 else none 
+    --let π : X → Option Y := λ x ↦ if (∃ y, (x, y) ∈ S) then sorry else none 
+    sorry
+    --use λ x ↦ if (g : ∃ y, (x, y) ∈ S) then some g.choose else none 
+  · intro ⟨π, h⟩ x y y' mem1 mem2
+    simp_all 
+     
+  done 
+
+lemma example_2_34_1 {Y : Type} [Inhabited X] [Inhabited Y] 
+    : InterStructure { graph π | π : X → Option Y } := 
+  {
+    ne := ⟨{}, λ _ ↦ none, by simp⟩ 
+    inter := by 
+      simp 
+      intro ι S sub
+      simp_all
+      refine' ⟨⨅ i, S i, _⟩; swap 
+      ext ⟨x, y⟩
+      simp 
+      constructor 
+      · intro eq i 
+        specialize sub i 
+        obtain ⟨pi, hpi⟩ := sub 
+        rw [←hpi]
+        simp 
+        sorry
+      · intro mem 
+        sorry
+      --have h : ∀ i i' y y' x, π i x = some y → π i' x = some y' → y = y' := sorry
+      
+      use λ x ↦ sorry
+      sorry 
+  }
+  
+/-!
+  (2) We decline to formalize this list as it involved other mathematical structures
+  beyond the scope of the current project. 
+  
+  (3) Same here. 
+  
+  (4) Same here. 
+  
+  Given a `PartialOrder P` and a map `F : P → P` an element `x ∈ P` is called a 
+  "fixpoint" of `F` if and only if `F x = x`. Fixpoints are treated in detail in 
+  Chapter 8. For now we state and prove the following famous theorem.
+-/
+
+/-!
+  ## 2.35 The Knaster-Tarski Fixpoint Theorem
+  
+  Let `L` be a complete lattice and `F : L → L` an order preserving map. Then 
+  `α := sSup { x : L | x ≤ F x }` is a fixpoint of `F`. Further, `α` is the 
+  greatest fixpoint of `F`. Dually, `F` has a least fixpoint given by 
+  `β := sInf { x : L | F x ≤ x }`. 
+-/
+
+theorem knasterTarskiFixpoint_a [CompleteLattice L] (F : L →o L) :
+    F (sSup { x | x ≤ F x }) = sSup { x | x ≤ F x } := by 
+  let H := { x | x ≤ F x }
+  let A := sSup H
+  have h : ∀ x ∈ H, x ≤ A ∧ x ≤ F x ∧ F x ≤ F A := 
+    λ x mem ↦ ⟨le_sSup mem, mem, F.monotone (le_sSup mem)⟩
+  have A_le : A ≤ F A := sSup_le λ x mem ↦ (h x mem).2.1.trans (h x mem).2.2
+  have FA_le : F A ≤ A := le_sSup (F.monotone A_le)
+  exact le_le_iff_eq.mp ⟨FA_le, A_le⟩
+  
+theorem knasterTarskiFixpoint_b [CompleteLattice L] (F : L →o L) :
+    ∀ x, (F x = x) → x ≤ sSup { x | x ≤ F x } := by 
+  intro x fp
+  symm at fp 
+  apply le_of_eq at fp 
+  exact le_sSup fp 
+
+theorem knasterTarskiFixpoint_dual_a [CompleteLattice L] (F : L →o L) :
+    F (sInf { x | F x ≤ x }) = sInf { x | F x ≤ x } := by
+  exact @knasterTarskiFixpoint_a Lᵒᵈ _ (OrderHom.dual F) 
+  
+theorem knasterTarskiFixpoint_dual_b [CompleteLattice L] (F : L →o L) : 
+    ∀ x, (F x = x) → sInf { x | F x ≤ x } ≤ x := by 
+  exact @knasterTarskiFixpoint_b Lᵒᵈ _ (OrderHom.dual F)
+
+/-!
+  These are indeed in Mathlib, albeit in a slightly different form. Mathlib has
+  `OrderHom.gfp F` that is an OrderHom from monotone maps on `L` to `L`. It 
+  maps `F` to `sSup { x | x ≤ F x }`. Similarly, it has `OrderHom.lfp F` that
+  takes `F` to its least fixed point. To show this is a fixed point, 
+  it has `OrderHom.isFixedPt_lfp`. It also has the fact it is the least fixed 
+  point by `OrderHom.isLeast_lfp` and also `OrderHom.lfp_le_fixed`. Oddly,
+  there is no equivalent `OrderHom.fixed_le_gfp` although it does have 
+  `OrderHom.isGreatest_gfp`. 
+-/ 
+
+/-!
+  # Chain conditions and completeness 
+  
+  I skipped the proof that every finite lattice is complete. However, there are
+  weaker finiteness conditions that already guarantee a lattice is complete. This
+  section introduces those. 
+-/
+  
+/-!
+  ## 2.37 Definitions 
+  
+  Let `P` be an ordered set. 
+  
+  (i) If `C = {c₀, c₁, cₙ}` is a finite chain in `P` with `∣C∣ = n + 1` then we
+  say that the "length" of `C` is `n`. (I.e., it's the number of uses of `⋖`.)
+  
+  (ii) `P` is said to have "length" `n`, written `ℓ(P) = n`, if the length of 
+  the longest chain in `P` is `n`. 
+  
+  (iii) `P` is of "finite length" if it has length `n` for some `n : ℕ`. 
+  
+  (iv) `P` has "no infinite chains" if every chain in `P` is finite.
+  
+  (v) `P` satisfies the "ascending chain condition", (ACC), if and only if 
+  given any sequence `x₁ ≤ x₂ ≤ ... ≤ xₙ ≤ ...` of elements of `P`, there 
+  exists `k : ℕ` such that `xₖ = xₖ₊₁ = ...`. The dual of the ascending 
+  chain condition is the descending chain condition (DCC). 
+  
+  Mathlib has `Set.chainHeight : Set P → ℕ∞` which is supremum over 
+  all finite chains `l`, of the length of `l`. This is essentially (ii)
+  above (except it works on `Set P`, so we have to feed it `Set.univ`). 
+  We can use this to define a predicate saying `P` is of finite length, 
+  giving us (iii). An infinite chain in `P` is essentially (the image of)
+  an order embedding of ℕ into `P`. We can thus express (iv) by saying that
+  there does not exist an OrderEmbedding of ℕ into `P`. 
+  The ACC or DCC does not seem to be defined
+  explicitly in Mathlib, however, there is `WellFounded.monotone_chain_condition` 
+  which says that `(⬝ > ⬝)` is well founded if and only if 
+  `∀ (a : ℕ →o P), ∃ (n : ℕ), ∀ (m : ℕ), n ≤ m → a n = a m`. That means that 
+  we can usually just substitute `WellFounded (· > ·)` for ACC. But for 
+  this study, we will express it explicitly, and use the above to prove the
+  equivalence. We also explicitly spell out the DCC in the definition
+  and show that it is the same (by `rfl`) as the ACC in the dual order. 
+-/
+  
+noncomputable def Order.length (P : Type) [PartialOrder P] : ℕ∞ := 
+  Set.chainHeight (Set.univ : Set P)
+  
+def Order.FiniteLength (P : Type) [PartialOrder P] : Prop := 
+  Order.length P ≠ ⊤
+    
+@[reducible]  
+def Order.NoInfiniteChains (P : Type) [PartialOrder P] : Prop := 
+  ¬∃ _ : ℕ ↪o P, true 
+    
+@[reducible]    
+def Order.ACC (P : Type) [PartialOrder P] : Prop := 
+  ∀ (f : ℕ →o P), ∃ n : ℕ, ∀ (m : ℕ), n ≤ m → f n = f m  
+
+@[reducible]        
+def Order.DCC (P : Type) [PartialOrder P] : Prop := 
+  ∀ (f : ℕ →o Pᵒᵈ), ∃ n : ℕ, ∀ (m : ℕ), n ≤ m → f n = f m  
+  
+lemma Order.ACC_dual_iff (P : Type) [PartialOrder P] :
+    Order.ACC Pᵒᵈ ↔ Order.DCC P := by rfl 
+    
+lemma Order.DCC_dual_iff (P : Type) [PartialOrder P] : 
+    Order.DCC Pᵒᵈ ↔ Order.ACC P := by rfl 
+
+lemma WellFoundedGT_iff_ACC [PartialOrder P] : 
+    WellFounded ((· > ·) : P → P → Prop) ↔ Order.ACC P := 
+  WellFounded.monotone_chain_condition
+  
+lemma WellFoundedLT_iff_DCC [PartialOrder P] :
+    WellFounded ((· < ·) : P → P → Prop) ↔ Order.DCC P :=
+  @WellFounded.monotone_chain_condition Pᵒᵈ _ 
+  
+/-!
+  ## 2.38 Examples 
+  
+  (1) A lattice of finite length has no infinite chains, and so satisfies both ACC
+  and DCC. (This is one of those deceptively hard things to work with.)
+-/
+
+lemma example_2_38_1a [Finite P] [PartialOrder P] : Order.ACC P := by 
+  rw [←WellFoundedGT_iff_ACC, ←isWellFounded_iff]
+  exact @Finite.to_wellFoundedGT P _ _
+  
+lemma example_2_38_1b [Finite P] [PartialOrder P] : Order.DCC P := 
+  @example_2_38_1a Pᵒᵈ _ _ 
+  
+/-!
+  (2) The lattice of ℕ under the divides relation satisfies DCC but not ACC. 
+  
+  I forget where this lattice instance is defined. So I skip it for now. 
+  
+  TODO: Define a type synonym for ℕ that has the lattice structure 
+  for divides on it. 
+  
+  (3) ℕ under the normal order satisfies DCC but not ACC. Dually, ℕᵒᵈ satisfies
+  ACC but not DCC. 
+-/
+
+lemma example_2_38_3a : Order.DCC ℕ := by 
+  rw [←WellFoundedLT_iff_DCC]
+  exact (@instWellFoundedRelation ℕ _).wf 
+
+lemma example_2_38_3b : ¬ Order.ACC ℕ := by 
+  simp [Order.ACC]
+  use ⟨λ n ↦ 2^n, by apply pow_right_mono; simp⟩
+  intro n 
+  use n + 1, by simp, by simp 
+
+lemma example_2_38a_dual : Order.ACC ℕᵒᵈ := example_2_38_3a 
+
+lemma example_2_38b_dual : ¬Order.DCC ℕᵒᵈ := example_2_38_3b 
+
+/-!
+  (4) This is about dimensions of vector spaces which I will skip for now. 
+-/
+
+/-!
+  ## 2.39 Lemma 
+  
+  A partial order `P` satisfies ACC if and only if every non-empty
+  subset `A` of `P` has a maximal element.
+  
+  The text defers a formal proof until chapter 10, so I will do the same. But
+  they note that the proof requires the axiom of choice. This is basically 
+  the dual of the Well-Ordering principle. 
+-/
+
+/- lemma example_2_39a [PartialOrder P] : Order.ACC P ↔ Order.NoInfiniteChains P := by
+  constructor
+  · simp
+    intro acc f 
+    specialize acc f 
+    obtain ⟨n, hn⟩ := acc 
+    specialize hn (n + 1) (by simp) 
+    apply f.inj' at hn 
+    simp at hn 
+  · simp
+    intro h f 
+    by_contra h1 
+    push_neg at h1 
+    have h1' : ∀ n, ∃ m, n < m ∧ f n ≠ f m := by 
+      intro n
+      obtain ⟨m, h1, h2⟩ := h1 n 
+      use m 
+      refine' ⟨_, h2⟩
+      apply lt_or_eq_of_le at h1 
+      cases' h1 with lt eq 
+      · exact lt
+      · subst n; contradiction 
+    clear h1 
+    let rec g : ℕ → P := λ n ↦ 
+      match n with 
+      | 0 => f 0
+      | k + 1 => g (h1' k).choose 
+    have g_map_rel_iff : ∀ a b, a ≤ b ↔ g a ≤ g b := by
+      intro a b 
+      constructor
+      · intro le
+        induction a with 
+        | zero => induction b with 
+          | zero => simp
+          | succ k IH => 
+            simp [g]
+            apply lt_or_eq_of_le at le 
+            cases' le with lt eq
+            · apply Nat.le_of_lt_succ at lt
+              specialize IH lt 
+              simp [g] at IH 
+              cases k with 
+              | zero => 
+                apply f.monotone 
+                exact le_of_lt (h1' Nat.zero).choose_spec.1
+              | succ l => 
+                apply f.monotone
+                
+            · sorry
+        | succ k => sorry
+      · sorry
+      done
+    have g_inj : Function.Injective g := sorry 
+    exact h ⟨g, g_inj, g_map_rel_iff⟩ 
+  done -/
+
+lemma example_2_39 [PartialOrder P] : Order.ACC P ↔ 
+    ∀ A : Set P, A.Nonempty → ∃ a ∈ A, ∀ b ∈ A, b ≤ a := by 
+  constructor 
+  · contrapose
+    intro max acc
+    simp [Order.ACC] at acc 
+    sorry
+    
+  · contrapose 
+    intro acc h 
+    simp [Order.ACC] at acc 
+    obtain ⟨f, hf⟩ := acc 
+    have hf0 := hf 0
+    let g : ℕ → P := λ n ↦ 
+      match n with 
+      | .zero => f 0
+      | .succ k => f (hf k).choose 
+    specialize h { f n | n : ℕ } (by use f 0; simp)
+    obtain ⟨a, ⟨n, hn⟩, h⟩ := h; 
+    subst a 
+    --specialize hf n 
+    obtain ⟨x, hx1, hx2⟩ := hf n
+    sorry
+    
+    
+
+/-!
+  ## 2.40 Theorem 
+  
+  A partial order `P` has no infinite chains, if and only if it satisfies
+  both ACC and DCC. 
+-/
+
+theorem example_2_40 [PartialOrder P] : 
+    Order.NoInfiniteChains P ↔ Order.ACC P ∧ Order.DCC P := by
+  constructor
+  · intro h 
+    constructor 
+    · intro f 
+      specialize h f 
+      simp [Function.Injective] at h 
+      obtain ⟨x, y, h1, h2⟩ := h 
+      wlog lt : x < y 
+      · sorry 
+      · sorry
+    · sorry 
+  · sorry
