@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2024 Paul D. Rowe. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Paul D. Rowe
+-/
 import OrderTheory.Mathlib.lib
 import Mathlib.Tactic
 
@@ -52,8 +57,8 @@ open scoped Classical
   The primary thing to specify for a Partial Order is the `≤` relation. Lean automatically
   infers the strict order `<` according the usual rule: `x < y ↔ x ≤ y ∧ x ≠ y`.
 -/
-variable {P Q R S α X Y P₁ P₂ : Type} 
-universe u v 
+variable {P Q R S α X Y P₁ P₂ : Type}
+universe u v
 
 /-!
   ## 1.3 Chains and Antichains
@@ -95,11 +100,11 @@ instance Fin'.instPartialOrder {n : Nat} : PartialOrder (Fin' n) :=
   }
 
 theorem Fin'.IsAntichain {n : Nat} : IsAntichain (· ≤ ·) (Set.univ : Set (Fin' n)) := by
-  intro x _ y _ neq le 
+  intro x _ y _ neq le
   apply neq
-  simp [LE.le] at le 
+  simp [LE.le] at le
   assumption
-  
+
 theorem Fin'.le_iff {n : Nat} {x y : Fin' n} : x ≤ y ↔ x = y := by rfl
 
 /-!
@@ -344,7 +349,7 @@ theorem Function.Option.le_antisymm {a b : X → Option Y} (h1 : a ≤ b) (h2 : 
       specialize h' y
       tauto
 
-instance Function.Option.instPartialOrder : 
+instance Function.Option.instPartialOrder :
     PartialOrder (X → Option Y) :=
   {
     le := LE.le
@@ -495,7 +500,7 @@ lemma image_covby_covby_of_image_lt_lt [Fintype P] [Fintype Q] [PartialOrder P]
       rw [←hu] at hw
       apply @nlt u ((h x u).1 hw.left)
       exact (h u y).1 hw.right
-        
+
 lemma image_lt_lt_of_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
     (∀ x y, f x ⋖ f y ↔ x ⋖ y) → (∀ x y, f x < f y ↔ x < y) := by
@@ -518,8 +523,8 @@ lemma image_lt_lt_of_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     | zero => intro x y hn; congr
     | succ k ih =>
       intro x y ⟨w, hw, covc⟩
-      exact ⟨f w, ⟨(h x w).2 hw, by apply ih w y covc⟩⟩  
-    
+      exact ⟨f w, ⟨(h x w).2 hw, by apply ih w y covc⟩⟩
+
 lemma image_lt_lt_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
     (∀ x y, f x < f y ↔ x < y) ↔ (∀ x y, f x ⋖ f y ↔ x ⋖ y) :=
@@ -908,7 +913,7 @@ theorem LowerSet.IsAntichain [PartialOrder P] {Q : Set P} (h : IsAntichain (· �
       ⟨s, by -- Must prove s is a lower set
         intro a b le mem
         rw [le_iff_lt_or_eq] at le
-        cases le with 
+        cases le with
         | inl lt =>
           exfalso
           apply IsAntichain.not_lt h (by simp) (by simp) lt
@@ -1015,7 +1020,7 @@ theorem LowerSet.dual_orderIso [PartialOrder P] :
     left_inv := λ s ↦ by simp only [carrier_eq_coe, _root_.compl_compl]; rfl
     right_inv := λ s ↦ by simp only [carrier_eq_coe, _root_.compl_compl]; rfl
     map_rel_iff' := by
-      intro ⟨s', _⟩ ⟨t', _⟩ 
+      intro ⟨s', _⟩ ⟨t', _⟩
       constructor <;> intro h
       · intro _ mem
         change s'ᶜ ⊆ t'ᶜ at h
@@ -1177,13 +1182,13 @@ def left_inv [PartialOrder P] :
     case pos.h_1 x t heq
     · simp_all
       obtain ⟨t', ht⟩ := t
-      simp only [LowerSet.mk.injEq] at heq 
+      simp only [LowerSet.mk.injEq] at heq
       subst t'
       ext y; constructor
       · intro mem
         cases mem with
         | inl eq => subst eq; exact h
-        | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1 
+        | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1
       · intro mem
         cases y with
         | none => simp; rw [WithBot.none_eq_bot]
