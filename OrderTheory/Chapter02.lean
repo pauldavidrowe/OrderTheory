@@ -270,7 +270,7 @@ lemma example_2_6_2b {A : ι → Set X} : ⨅ i, A i = ⋂ i, A i := rfl
       it is closed under arbitrary unions and intersections.
 -/
 
-lemma example_2_6_3a {X : Type} (𝔏 : Set (Set X))
+def example_2_6_3a {X : Type} (𝔏 : Set (Set X))
     (hUnion : ∀ S T, S ∈ 𝔏 → T ∈ 𝔏 → S ∪ T ∈ 𝔏)
     (hInter : ∀ S T, S ∈ 𝔏 → T ∈ 𝔏 → S ∩ T ∈ 𝔏) :
     Lattice { S : Set X | S ∈ 𝔏} :=
@@ -291,7 +291,7 @@ local instance example_2_6_3bSupSet (𝔏 : Set (Set X))
 
 local instance example_2_6_3bSup (𝔏 : Set (Set X))
     [SupSet { S : Set X // S ∈ 𝔏}] :
-  Sup { S : Set X // S ∈ 𝔏} := ⟨λ S T ↦ sSup {S, T}⟩
+  Max { S : Set X // S ∈ 𝔏} := ⟨λ S T ↦ sSup {S, T}⟩
 
 local instance example_2_6_3InfSet {X : Type} (𝔏 : Set (Set X))
     (hInter : ∀ (I : Set (Set X)), I ⊆ 𝔏 → ⋂ i : I, i ∈ 𝔏) :
@@ -299,14 +299,14 @@ local instance example_2_6_3InfSet {X : Type} (𝔏 : Set (Set X))
 
 local instance example_2_6_3bInf (𝔏 : Set (Set X))
     [InfSet { S : Set X // S ∈ 𝔏}] :
-  Inf { S : Set X // S ∈ 𝔏} := ⟨λ S T ↦ sInf {S, T}⟩
+  Min { S : Set X // S ∈ 𝔏} := ⟨λ S T ↦ sInf {S, T}⟩
 
 
 
 /-- We only need to prove it's a complete semilattice with sup -/
-lemma example_2_6_3b {X : Type} (𝔏 : Set (Set X))
+def example_2_6_3b {X : Type} (𝔏 : Set (Set X))
     (hUnion : ∀ (I : Set (Set X)), I ⊆ 𝔏 → ⋃ i : I, i ∈ 𝔏)
-    (hInter : ∀ (I : Set (Set X)), I ⊆ 𝔏 → ⋂ i : I, i ∈ 𝔏) :
+    (_ : ∀ (I : Set (Set X)), I ⊆ 𝔏 → ⋂ i : I, i ∈ 𝔏) :
     CompleteSemilatticeSup { S : Set X // S ∈ 𝔏} :=
   {
     sSup := λ I ↦ ⟨⋃ i : I, i, by specialize hUnion I; simp_all⟩
@@ -343,26 +343,26 @@ lemma example_2_6_3c [PartialOrder P]
 @[simp]
 local instance instOrderTop {n : ℕ} : OrderTop (WithTop (WithBot (Fin' n))) :=
   {
-    top := none
+    top := ⊤
     le_top := by simp
   }
 
 @[simp]
 local instance instOrderBot {n : ℕ} : OrderBot (WithTop (WithBot (Fin' n))) :=
   {
-    bot := some none
+    bot := ↑⊥
     bot_le := by
       intro a
       cases a with
-      | none => simp
-      | some a => simp
+      | top => simp
+      | coe a => exact bot_le
   }
 
 @[simp]
 noncomputable
-instance instrSup {n : ℕ} : Sup (WithTop (WithBot (Fin' n))) :=
+instance instrSup {n : ℕ} : Max (WithTop (WithBot (Fin' n))) :=
   {
-    sup := λ
+    max := λ
       | ⊥, y => y
       | x, ⊥ => x
       | x, y => if x = y then x else ⊤
@@ -370,9 +370,9 @@ instance instrSup {n : ℕ} : Sup (WithTop (WithBot (Fin' n))) :=
 
 @[simp]
 noncomputable
-local instance instInf {n : ℕ} : Inf (WithTop (WithBot (Fin' n))) :=
+local instance instInf {n : ℕ} : Min (WithTop (WithBot (Fin' n))) :=
   {
-    inf := λ
+    min := λ
       | x, ⊤ => x
       | ⊤, y => y
       | x, y => if x = y then x else ⊥
@@ -382,6 +382,7 @@ noncomputable
 local instance instrSemilatticeSup {n : Nat} :
     SemilatticeSup (WithTop (WithBot (Fin' n))) :=
   {
+    sup := instrSup.max
     le_sup_left := by
       intro x y
       cases_type* WithTop WithBot
@@ -394,12 +395,24 @@ local instance instrSemilatticeSup {n : Nat} :
       split_ifs <;> simp_all
     sup_le := by
       intro x y z le1 le2
-      cases_type* WithTop WithBot <;> simp_all [LE.le]
+      cases_type* WithTop <;> simp_all [WithTop.none_eq_top, WithTop.some_eq_coe]
+      cases_type* WithBot <;> simp_all [WithBot.none_eq_bot]
+      · rw [WithTop.some_eq_coe]; simp
+      · apply bot_le
+      · rw [WithTop.some_eq_coe]; simp; assumption
+      · rw [WithTop.some_eq_coe]; simp; assumption
+      · split_ifs with h
+        · rw [←h, WithTop.some_eq_coe, WithTop.coe_le_coe]
+          simp [WithBot.some_eq_coe]; assumption
+        · rw [Fin'.le_iff] at le1 le2
+          rw [le1, le2] at h
+          contradiction
   }
 
 noncomputable
 local instance instSemilatticeInf {n : Nat} : Lattice (WithTop (WithBot (Fin' n))) :=
   {
+    inf := instInf.min
     inf_le_left := by
       intro x y
       cases_type* WithTop WithBot
@@ -412,16 +425,12 @@ local instance instSemilatticeInf {n : Nat} : Lattice (WithTop (WithBot (Fin' n)
       all_goals split_ifs <;> simp_all
     le_inf := by
       intro x y z le1 le2
-      cases_type* WithTop WithBot
-      all_goals try rw [WithTop.none_eq_top] at *
-      all_goals try simp_all
-      all_goals try rw [WithTop.none_eq_top] at *
-      all_goals try simp_all
-      all_goals split_ifs
-      all_goals try simp_all
-      case neg x y z h
-      · rw [Fin'.le_iff] at le1 le2
-        subst y; subst z
+      cases_type* WithTop <;> simp_all [WithTop.none_eq_top, WithTop.some_eq_coe]
+      cases_type* WithBot <;> simp_all [WithBot.none_eq_bot, WithBot.some_eq_coe]
+      rw [Fin'.le_iff] at le1 le2
+      split_ifs with h
+      · rw [le1, h]
+      · rw [←le1, le2] at h
         contradiction
   }
 
@@ -534,7 +543,7 @@ theorem example_2_9_inf_sup_self [Lattice L] {a b : L} : a ⊓ (a ⊔ b) = a :=
   will try to get by without either of them.
 -/
 
-theorem example_2_10_i [Sup L] [Inf L]
+theorem example_2_10_i [Max L] [Min L]
     (L2 : ∀ {a b : L}, a ⊔ b = b ⊔ a)
     (L2': ∀ {a b : L}, a ⊓ b = b ⊓ a)
     (L4 : ∀ {a b : L}, a ⊔ (a ⊓ b) = a)
@@ -544,7 +553,7 @@ theorem example_2_10_i [Sup L] [Inf L]
   · rw [←h]; exact L4'
   · rw [←h, L2, L2']; exact L4
 
-def LatPO [Sup L] [Inf L]
+def LatPO [Max L] [Min L]
     (L1 : ∀ {a b c : L}, (a ⊔ b) ⊔ c = a ⊔ (b ⊔ c))
     (L1': ∀ {a b c : L}, (a ⊓ b) ⊓ c = a ⊓ (b ⊓ c))
     (L2 : ∀ {a b : L}, a ⊔ b = b ⊔ a)
@@ -556,6 +565,8 @@ def LatPO [Sup L] [Inf L]
       a ⊔ a = a ⊔ a ⊓ (a ⊔ a) := by rw [L4']
       _ = a := by rw [L4]
   {
+    sup := Max.max
+    inf := Min.min
     le := λ a b ↦ a ⊔ b = b
     le_refl := L3
     le_trans := by
@@ -635,10 +646,10 @@ section
 def LNat : Type := ℕ
 
 @[simp]
-instance LNat.instSuplocal : Sup LNat := { sup := Nat.lcm }
+instance LNat.instSuplocal : Max LNat := { max := Nat.lcm }
 
 @[simp]
-instance LNat.instInflocal : Inf LNat := { inf := Nat.gcd }
+instance LNat.instInflocal : Min LNat := { min := Nat.gcd }
 
 instance LNat.instCCMWZ : CancelCommMonoidWithZero LNat := Nat.instCancelCommMonoidWithZero
 instance LNat.instNGCDM : NormalizedGCDMonoid LNat := by
@@ -650,7 +661,9 @@ lemma gcd_lcm_self (n m : LNat) : Nat.gcd n (Nat.lcm n m) = n := by
 
 lemma lcm_gcd_self (n m : LNat) : Nat.lcm n (Nat.gcd n m) = n  := by
   have h := Nat.gcd_dvd_left n m
-  exact (lcm_eq_left_iff n _ (by simp)).mpr h
+  have : normalize n = n := by simp only [normalize, normUnit, Units.val_one, mul_one,
+    MonoidWithZeroHom.coe_mk, ZeroHom.coe_mk]
+  exact (lcm_eq_left_iff n _ this).mpr h
 
 instance example_2_12_L : Lattice LNat :=
   Lattice.mk' lcm_comm lcm_assoc gcd_comm gcd_assoc lcm_gcd_self gcd_lcm_self
@@ -712,7 +725,7 @@ def example_2_14a [Lattice L] (x : L) : Sublattice L :=
   More generally, any non-empty chain in a lattice is a sublattice.
 -/
 
-def example_2_14b [Lattice L] {K : Set L} (h : IsChain_le K) :
+def example_2_14b [Lattice L] {K : Set L} (h : IsChainLE K) :
     Sublattice L :=
   {
     carrier := K
@@ -761,7 +774,7 @@ def example_2_14b [Lattice L] {K : Set L} (h : IsChain_le K) :
   `L × {k₀}` for any `l₀` and `k₀`. I'll only do one of these.
 -/
 
-lemma exercise_2_15_a [Lattice L] [Lattice K] (l₀  : L) :
+def exercise_2_15_a [Lattice L] [Lattice K] (l₀  : L) :
     K ≃o ({ (l, _) | l = l₀ } : Set (L × K)) :=
   {
     toFun := λ k ↦ ⟨(l₀, k), by simp⟩
@@ -807,7 +820,7 @@ lemma exercise_2_15_a [Lattice L] [Lattice K] (l₀  : L) :
   lattice hom, and hence also a lattice isomorphism.
 -/
 
-lemma example_2_17_1 [Lattice L] [Lattice K] (η : LatticeHom L K) (invFun : K → L)
+def example_2_17_1 [Lattice L] [Lattice K] (η : LatticeHom L K) (invFun : K → L)
     (leftInv : Function.LeftInverse invFun η.toFun)
     (rightInv : Function.RightInverse invFun η.toFun)
     : LatticeHom K L :=
@@ -982,7 +995,7 @@ lemma example_2_20_lattice_ideal [Lattice L] (J : Order.Ideal L) :
   The text says that every ideal of a lattice is a sublattice.
 -/
 
-lemma example_2_20_ideal_toSublattice [Lattice L] (J : Order.Ideal L) : Sublattice L :=
+def example_2_20_ideal_toSublattice [Lattice L] (J : Order.Ideal L) : Sublattice L :=
   {
     carrier := J
     supClosed' := by
@@ -1042,7 +1055,7 @@ lemma example_2_20_withTop_ideal [Lattice L] [OrderTop L] (J : Order.Ideal L) :
   by `a`. Dually `↑ᵖa` is a principal filter.
 -/
 
-lemma example_2_20_principal_ideal [Lattice L] (a : L) : Order.Ideal L :=
+def example_2_20_principal_ideal [Lattice L] (a : L) : Order.Ideal L :=
   {
     carrier := ↓ᵖa
     lower' := (↓ᵖa).lower'
@@ -1297,16 +1310,16 @@ lemma example_2_23a [CompleteLattice P] (S T : Set P) :
     | inl smem => exact le_trans (le_sSup smem) le_sup_left
     | inr tmem => exact le_trans (le_sSup tmem) le_sup_right
   · apply sup_le
-    · exact (example_2_22_v _ _ (Set.subset_union_left S T)).1
-    · exact (example_2_22_v _ _ (Set.subset_union_right S T)).1
+    · exact (example_2_22_v _ _ (Set.subset_union_left)).1
+    · exact (example_2_22_v _ _ (Set.subset_union_right)).1
 
 lemma example_2_23b [CompleteLattice P] (S T : Set P) :
     sInf (S ∪ T) = (sInf S) ⊓ (sInf T) := by
   rw [←le_le_iff_eq]
   constructor
   · apply le_inf
-    · exact (example_2_22_v _ _ (Set.subset_union_left S T)).2
-    · exact (example_2_22_v _ _ (Set.subset_union_right S T)).2
+    · exact (example_2_22_v _ _ (Set.subset_union_left)).2
+    · exact (example_2_22_v _ _ (Set.subset_union_right)).2
   · rw [example_2_22_ii]
     intro st stmem
     cases stmem with
@@ -1545,7 +1558,7 @@ lemma example_2_29_ii (𝔏 : Set (Set X)) (A : ι → Set X)
   bound in `P`. (In fact, sSup S = sInf (Sᵘ))
 -/
 
-lemma example_2_30 [PartialOrder P]
+def example_2_30 [PartialOrder P]
     (infs : Π S : Set P, S.Nonempty → { x // IsGLB S x }) :
     Π (S : Set P), (Sᵘ).Nonempty → { y // IsLUB S y } := by
   intro S ne
@@ -1609,7 +1622,7 @@ def example_2_31_ii_iiib [PartialOrder P]
   · intro S _
     exact h S  -/
 
-lemma example_2_31_ii_i [PartialOrder P]
+def example_2_31_ii_i [PartialOrder P]
     (h : Π S : Set P, {x // IsGLB S x}) : CompleteLattice P :=
   have h' := example_2_31_ii_iiib h
   haveI : OrderTop P := example_2_31_ii_iiia h
@@ -1689,7 +1702,8 @@ lemma example_2_31_ii_i [PartialOrder P]
       simp
   }
 
-lemma example_2_31_iii_ii [PartialOrder P] [ot : OrderTop P]
+noncomputable
+def example_2_31_iii_ii [PartialOrder P] [ot : OrderTop P]
     (h : Π S : Set P, S.Nonempty → { x // IsGLB S x }) :
     Π S : Set P, { x // IsGLB S x } := λ S ↦ by
   by_cases ne : S.Nonempty
@@ -1697,15 +1711,11 @@ lemma example_2_31_iii_ii [PartialOrder P] [ot : OrderTop P]
   · rw [Set.nonempty_iff_ne_empty] at ne
     simp at ne
     subst S
-    have : IsGLB ∅ ⊤ := by
-      constructor
-      · simp
-      · simp
-        intro x _
-        exact ot.le_top x
+    have : IsGLB (∅ : Set P) ⊤ := by simp
     exact ⟨⊤, this⟩
 
-lemma example_2_31_iii_i [PartialOrder P] [ot : OrderTop P]
+noncomputable
+def example_2_31_iii_i [PartialOrder P] [ot : OrderTop P]
   (h : Π S : Set P, S.Nonempty → { x // IsGLB S x }) :
   CompleteLattice P := by
   have h' := example_2_31_iii_ii h
@@ -1725,8 +1735,9 @@ lemma example_2_31_iii_i [PartialOrder P] [ot : OrderTop P]
   and `⨆ (i : ι), A i = ⋃₀ { B ∈ 𝔏 | ⋃ (i : ι), A i ⊆ B}`
 -/
 
-lemma example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
-    (h2 : ∀ (ι : Type 0) (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏) :
+noncomputable
+def example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
+    (h2 : ∀ (ι : Type 0) [Inhabited ι] (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏) :
     CompleteLattice 𝔏 := by
   have ot : OrderTop 𝔏 :=
     {
@@ -1735,7 +1746,7 @@ lemma example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
         intro a x _; simp
     }
   have h3 : Π S : Set 𝔏, S.Nonempty → { x // IsGLB S x } := by
-    intro S _
+    intro S nes
     set A : S → Set X := λ X ↦ X.val with hA
     have HA : ∀ S, A ↑S = ↑↑S := by
       intro S1
@@ -1743,6 +1754,8 @@ lemma example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
     have sub : { A i | i : S } ⊆ 𝔏 := by
       intro x ⟨i, hi⟩; subst x
       rw [hA]; simp
+    have : Nonempty S := Set.Nonempty.to_subtype nes
+    inhabit ↥S
     have g := h2 ↥S A sub
     refine' ⟨⟨⋂ (i : S), A i, g⟩, _⟩
     constructor
@@ -1779,7 +1792,7 @@ lemma example_2_32 (𝔏 : Set (Set X)) (h1 : (Set.univ : Set X) ∈ 𝔏)
 
 class InterStructure (𝔏 : Set (Set X)) where
   ne : 𝔏.Nonempty
-  inter : ∀ (ι : Type 0) (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏
+  inter : ∀ (ι : Type 0) [Inhabited ι] (A : ι → Set X), { A i | i : ι } ⊆ 𝔏 → ⋂ (i : ι), A i ∈ 𝔏
 
 class ToppedInterStructure (𝔏 : Set (Set X)) extends InterStructure 𝔏 where
   univ_mem : (Set.univ : Set X) ∈ 𝔏
@@ -1789,7 +1802,8 @@ class ToppedInterStructure (𝔏 : Set (Set X)) extends InterStructure 𝔏 wher
   `ToppedInterStructure`s.
 -/
 
-lemma example_2_33 {𝔏 : Set (Set X)} [Inst : ToppedInterStructure 𝔏] : CompleteLattice 𝔏 :=
+noncomputable
+def example_2_33 {𝔏 : Set (Set X)} [Inst : ToppedInterStructure 𝔏] : CompleteLattice 𝔏 :=
   example_2_32 𝔏 Inst.univ_mem Inst.inter
 
 /-!
@@ -1838,27 +1852,92 @@ lemma example_2_34_1c {Y : Type} (S : Set (X × Y)) :
     (∀ x y y', (x, y) ∈ S → (x, y') ∈ S → y = y') ↔ ∃ π : X → Option Y, S = graph π := by
   constructor
   · intro h
-    --use λ x ↦ if ∃ s ∈ S, s.1 = x then s.2 else none
-    --let π : X → Option Y := λ x ↦ if (∃ y, (x, y) ∈ S) then sorry else none
-    sorry
-    --use λ x ↦ if (g : ∃ y, (x, y) ∈ S) then some g.choose else none
+    refine ⟨?_, ?_⟩
+    · intro x
+      by_cases e : ∃ y, (x, y) ∈ S
+      · let a := Exists.choose e
+        exact some a
+      · exact none
+    · ext ⟨x, y⟩
+      constructor
+      · intro mem
+        dsimp only [graph, Set.mem_setOf_eq]
+        split_ifs with e
+        · simp
+          apply h x e.choose y e.choose_spec mem
+        · apply e ⟨y, mem⟩
+      · intro mem
+        simp only [graph, Option.dite_none_right_eq_some, Option.some.injEq,
+            Set.mem_setOf_eq] at mem
+        obtain ⟨e, he⟩ := mem
+        rw [←he]
+        exact e.choose_spec
   · intro ⟨π, h⟩ x y y' mem1 mem2
     simp_all
 
-  done
-
-lemma example_2_34_1 {Y : Type} [Inhabited X] [Inhabited Y]
+def example_2_34_1 {Y : Type} [Inhabited X] [Inhabited Y]
     : InterStructure { graph π | π : X → Option Y } :=
   {
     ne := ⟨{}, λ _ ↦ none, by simp⟩
     inter := by
-      simp
-      intro ι S sub
-      sorry
+      simp only [Set.setOf_subset_setOf, forall_exists_index, forall_apply_eq_imp_iff,
+        Set.mem_setOf_eq]
+      -- Let {Sᵢ} be a family of sets such that each one is the graph of some πᵢ
+      intro ι inh S sub
+      -- Show there is some partial function π whose graph is ⋂ i, Sᵢ
+      refine ⟨?_, ?_⟩
+      -- We define π as follows
+      · intro x
+        -- For any x, decide if there is a y so that all the Sᵢ have (x, y) as a member.
+        by_cases e : ∃ y, (∀ i, (x, y) ∈ S i)
+          -- If so, define π(x) to be such a y (using Exists.choose)
+        · exact some e.choose
+          -- Otherwise, π(x) is undefined
+        · exact none
+      -- We now prove that graph π = ⋂ i, Sᵢ
+      · ext ⟨x, y⟩
+        constructor
+        -- Assume (x, y) ∈ graph π
+        · intro eq
+          -- Let Sᵢ be any set of the family. We must show (x, y) ∈ Sᵢ
+          intro Si imem
+          obtain ⟨i, hi⟩ := imem
+          rw[←hi]; dsimp only
+          -- Since (x, y) ∈ graph π, the choice function gives a y', s.t. (x, y') is in each Sᵢ
+          -- and y' = y
+          simp only [graph, Option.dite_none_right_eq_some, Option.some.injEq,
+              Set.mem_setOf_eq] at eq
+          obtain ⟨e, he⟩ := eq
+          have hec := e.choose_spec i
+          -- Since (x, y') ∈ Sᵢ and y' = y, (x, y) ∈ Sᵢ
+          rwa [he] at hec
+        -- Conversely, assume (x, y) ∈ ⋂ i, Sᵢ
+        · intro con; simp only [Set.mem_iInter] at con
+          -- To show that (x, y) ∈ graph π, we must show that there is a y' s.t.
+          -- (x, y') is in each Sᵢ and that y' = y.
+          simp only [graph, Option.dite_none_right_eq_some, Option.some.injEq, Set.mem_setOf_eq]
+          refine ⟨?_, ?_⟩
+          -- We first show there is a y' s.t. (x, y') in in each Sᵢ, with y as witness
+          · use y
+          -- We now show that the choice function is unique, i.e. we get the y we need
+          · let e : ∃ y, ∀ i, (x, y) ∈ S i := ⟨y, con⟩
+            -- Since ι is inhabited, we know the choice function gives us y' s.t.
+            -- (x, y') ∈ Sᵢ for some default i
+            obtain h :=  e.choose_spec default
+            -- And we know (x, y) ∈ Sᵢ as well, by assumption
+            specialize con default
+            -- But since Sᵢ is the graph of some πᵢ, (x, y) and (x, y') are in the same graph
+            obtain ⟨p, hp⟩ := sub default
+            unfold graph at hp
+            rw [←hp] at h con
+            -- So y' = y
+            simp [Set.mem_setOf_eq] at h con
+            rw [h] at con
+            rwa [Option.some.injEq] at con
   }
 
 /-!
-  (2) We decline to formalize this list as it involved other mathematical structures
+  (2) We decline to formalize this list as it involves other mathematical structures
   beyond the scope of the current project.
 
   (3) Same here.
@@ -1967,8 +2046,12 @@ def Order.FiniteLength (P : Type) [PartialOrder P] : Prop :=
   Order.length P ≠ ⊤
 
 @[reducible]
-def Order.NoInfiniteChains (P : Type) [PartialOrder P] : Prop :=
+def Order.NoInfiniteChains' (P : Type) [PartialOrder P] : Prop :=
   ¬∃ _ : ℕ ↪o P, true
+
+@[reducible]
+def Order.NoInfiniteChains (P : Type) [PartialOrder P] : Prop :=
+  ∀ Q : Set P, IsChainLE ↑Q → Finite Q
 
 @[reducible]
 def Order.ACC (P : Type) [PartialOrder P] : Prop :=
@@ -1991,6 +2074,75 @@ lemma WellFoundedGT_iff_ACC [PartialOrder P] :
 lemma WellFoundedLT_iff_DCC [PartialOrder P] :
     WellFounded ((· < ·) : P → P → Prop) ↔ Order.DCC P :=
   @WellFounded.monotone_chain_condition Pᵒᵈ _
+
+lemma Order.NoInfiniteChains.Dual {P : Type} [PartialOrder P] :
+    Order.NoInfiniteChains P → Order.NoInfiniteChains Pᵒᵈ := by
+  simp [NoInfiniteChains]
+  intro h Q ch
+  set Q' := { OrderDual.ofDual q | q ∈ Q } with hQ
+  have : Q ≃ Q' := by
+    refine Set.BijOn.equiv ?f ?h
+    · intro pd; exact OrderDual.ofDual pd
+    · constructor
+      · intro p
+        simp [Q']
+      · constructor
+        · intro a amem b bmem
+          simp
+        · intro a amem
+          simp [Q'] at amem ⊢
+          assumption
+  have ch' : IsChainLE Q' := by
+    simp [IsChainLE, IsChain] at ch ⊢
+    intro a amem b bmem ne
+    have amem' : OrderDual.toDual a ∈ Q := by simp [Q'] at amem; assumption
+    have bmem' : OrderDual.toDual b ∈ Q := by simp [Q'] at bmem; assumption
+    specialize ch amem' bmem' ne
+    exact id (Or.symm ch)
+  specialize h { OrderDual.ofDual q | q ∈ Q } ch'
+  rw [←hQ] at h
+  exact (Equiv.finite_iff (id this.symm)).mp h
+
+lemma Order.NoInfiniteChains.Dual_iff {P : Type} [PartialOrder P] :
+    Order.NoInfiniteChains P ↔ Order.NoInfiniteChains Pᵒᵈ :=
+  ⟨Order.NoInfiniteChains.Dual, Order.NoInfiniteChains.Dual⟩
+
+lemma Order.no_strict_inc_of_ACC [PartialOrder P] (acc : Order.ACC P) (f : P → P) (p : P) :
+    ¬∀ p, p < f p := by
+  by_contra h
+  let g : ℕ → P := Nat.rec p fun _ ↦ f
+  have hg : ∀ n, g n < g (n + 1) := by intro n; exact h (g n)
+  let G : ℕ →o P := ⟨g, StrictMono.monotone <| strictMono_nat_of_lt_succ hg⟩
+  obtain ⟨n, hn⟩ := acc G
+  specialize hn (n + 1) (by simp)
+  specialize hg n
+  have : ∀ n, G n = g n := by intro n; rfl
+  rw [this n, this (n + 1)] at hn
+  rw [hn] at hg
+  exact (lt_self_iff_false (g (n + 1))).mp hg
+
+lemma Order.no_strinct_dec_of_DCC [PartialOrder P] (dcc : Order.DCC P) (f : P → P) (p : P) :
+    ¬∀ p, f p < p := Order.no_strict_inc_of_ACC dcc f p
+
+lemma Order.no_strict_inc_on_of_ACC [PartialOrder P] (acc : Order.ACC P) (A : Set P) (f : A → A) (p : A) :
+    ¬∀ p, p < f p := by
+  by_contra h
+  let g : ℕ → A := Nat.rec p fun _ ↦ f
+  have hg : ∀ n, g n < g (n + 1) := by intro n; exact h (g n)
+  let G : ℕ →o P := ⟨λ a ↦ (g a).val, StrictMono.monotone <| strictMono_nat_of_lt_succ hg⟩
+  obtain ⟨n, hn⟩ := acc G
+  specialize hn (n + 1) (by simp)
+  specialize hg n
+  have hg' : (g n).val < (g (n + 1)).val := by exact h (g n)
+  have : ∀ n, G n = (g n).val := by intro n; rfl
+  rw [this n, this (n + 1)] at hn
+  rw [hn] at hg'
+  apply (lt_self_iff_false (g (n + 1))).mp hg'
+
+lemma Order.no_strict_dec_on_of_DCC [PartialOrder P] (dcc : Order.DCC P) (A : Set P) (f : A → A) (p : A) :
+    ¬∀ p, f p < p := Order.no_strict_inc_on_of_ACC dcc A f p
+
+
 
 /-!
   ## 2.38 Examples
@@ -2020,11 +2172,11 @@ lemma example_2_38_1b [Finite P] [PartialOrder P] : Order.DCC P :=
 
 lemma example_2_38_3a : Order.DCC ℕ := by
   rw [←WellFoundedLT_iff_DCC]
-  exact (@instWellFoundedRelation ℕ _).wf
+  exact wellFounded_lt
 
 lemma example_2_38_3b : ¬ Order.ACC ℕ := by
   simp [Order.ACC]
-  use ⟨λ n ↦ 2^n, by apply pow_right_mono; simp⟩
+  use ⟨λ n ↦ 2^n, by apply pow_right_mono₀; simp⟩
   intro n
   use n + 1, by simp, by simp
 
@@ -2042,92 +2194,120 @@ lemma example_2_38b_dual : ¬Order.DCC ℕᵒᵈ := example_2_38_3b
   A partial order `P` satisfies ACC if and only if every non-empty
   subset `A` of `P` has a maximal element.
 
-  The text defers a formal proof until chapter 10, so I will do the same. But
-  they note that the proof requires the axiom of choice. This is basically
-  the dual of the Well-Ordering principle.
+  The text defers a formal proof until chapter 10, but I tackle it here.
+  They note that the proof requires the axiom of choice.
 -/
 
-/- lemma example_2_39a [PartialOrder P] : Order.ACC P ↔ Order.NoInfiniteChains P := by
-  constructor
-  · simp
-    intro acc f
-    specialize acc f
-    obtain ⟨n, hn⟩ := acc
-    specialize hn (n + 1) (by simp)
-    apply f.inj' at hn
-    simp at hn
-  · simp
-    intro h f
-    by_contra h1
-    push_neg at h1
-    have h1' : ∀ n, ∃ m, n < m ∧ f n ≠ f m := by
-      intro n
-      obtain ⟨m, h1, h2⟩ := h1 n
-      use m
-      refine' ⟨_, h2⟩
-      apply lt_or_eq_of_le at h1
-      cases' h1 with lt eq
-      · exact lt
-      · subst n; contradiction
-    clear h1
-    let rec g : ℕ → P := λ n ↦
-      match n with
-      | 0 => f 0
-      | k + 1 => g (h1' k).choose
-    have g_map_rel_iff : ∀ a b, a ≤ b ↔ g a ≤ g b := by
-      intro a b
-      constructor
-      · intro le
-        induction a with
-        | zero => induction b with
-          | zero => simp
-          | succ k IH =>
-            simp [g]
-            apply lt_or_eq_of_le at le
-            cases' le with lt eq
-            · apply Nat.le_of_lt_succ at lt
-              specialize IH lt
-              simp [g] at IH
-              cases k with
-              | zero =>
-                apply f.monotone
-                exact le_of_lt (h1' Nat.zero).choose_spec.1
-              | succ l =>
-                apply f.monotone
-
-            · sorry
-        | succ k => sorry
-      · sorry
-      done
-    have g_inj : Function.Injective g := sorry
-    exact h ⟨g, g_inj, g_map_rel_iff⟩
-  done -/
-
 lemma example_2_39 [PartialOrder P] : Order.ACC P ↔
-    ∀ A : Set P, A.Nonempty → ∃ a ∈ A, ∀ b ∈ A, b ≤ a := by
+    ∀ A : Set P, A.Nonempty → ∃ a, Maximal (· ∈ A) a := by
   constructor
   · contrapose
-    intro max acc
-    simp [Order.ACC] at acc
-    sorry
-
+    -- Assume there is a nonempty set A with no maximal element, and that ACC holds.
+    intro nmax acc
+    push_neg at nmax
+    simp only [Order.ACC] at acc
+    obtain ⟨A, ne, h⟩ := nmax
+    -- Since A is nonempty, it has some element p.
+    obtain ⟨p, hp⟩ := ne
+    simp only [Maximal, not_and, not_forall, Classical.not_imp] at h
+    -- We mimic the Mathlib proof for orders with no maximal elements.
+    -- This is given by the typeclass NoMaxOrder, which A satisfies.
+    have nmo : NoMaxOrder A := by
+      constructor
+      intro a
+      obtain ⟨b, hb1, hb2, hb3⟩ := h a <| Subtype.coe_prop a
+      exact ⟨⟨b, hb1⟩, lt_of_le_not_le hb2 hb3⟩
+    -- Using the axiom of choice, we can construct a strictly increasing function g: A → A
+    choose g hg using fun x : A => exists_gt x
+    -- From g, we construct f: ℕ → A by f 0 = p, f (n + 1) = f (g n).
+    let f : ℕ → A := Nat.rec ⟨p, hp⟩ fun _ ↦ g
+    -- Since g is strictly monotone, so is f,
+    have smf : StrictMono f := strictMono_nat_of_lt_succ fun n ↦ hg _
+    -- and so it must also be (weekly) monotone.
+    have mf : Monotone f := by exact StrictMono.monotone smf
+    -- Thus we can promote f to the order homomorphism needed by ACC.
+    let h : ℕ →o P :=
+    {
+      toFun := λ n => (f n).1
+      monotone' := by
+        intro a b le
+        apply mf le
+    }
+    -- From ACC we obtain an n : ℕ, after which h becomes constant
+    obtain ⟨n, hn⟩ := acc h
+    -- Since h is strictly monotone, this will be a contradiction.
+    -- In particular, consider n and n + 1. By ACC h n = h (n + 1).
+    specialize hn (n + 1) (by simp)
+    -- But by monotonicity of h, h n < h (n + 1)
+    have hn' : h n < h (n + 1) := smf (by simp : n < n + 1)
+    -- This contradicts irreflexivity of <.
+    rw [hn] at hn'
+    exact lt_irrefl _ hn'
   · contrapose
-    intro acc h
-    simp [Order.ACC] at acc
+    -- Assume ACC doesn't hold, and prove there is a set without a maximal element.
+    intro acc; push_neg
+    simp only [Order.ACC, not_forall, not_exists, Classical.not_imp] at acc
+    -- Since ACC doesn't hold, there is a monotone f that doesn't stabilze.
     obtain ⟨f, hf⟩ := acc
-    have hf0 := hf 0
-    let g : ℕ → P := λ n ↦
-      match n with
-      | .zero => f 0
-      | .succ k => f (hf k).choose
-    specialize h { f n | n : ℕ } (by use f 0; simp)
-    obtain ⟨a, ⟨n, hn⟩, h⟩ := h;
-    subst a
-    --specialize hf n
-    obtain ⟨x, hx1, hx2⟩ := hf n
-    sorry
+    -- We take the range of f to be the set without a maximal element.
+    use (Set.range f), ⟨f 0, by simp⟩
+    -- To show there's no maximal element, consider any element a, and assume it's maximal.
+    intro a ⟨⟨N, hN⟩, h2⟩
+    -- Using the property of f, we get M > N (where f N = a) and f N ≠ f M
+    obtain ⟨M, hM, eq⟩ := hf N
+    -- Since f is monotone, we know f N ≤ f M.
+    have le := f.monotone' hM
+    -- But since, a = f N is assumed maximal, this implies f M ≤ f N
+    specialize h2 (by simp : f M ∈ Set.range f)
+    rw [←hN] at h2
+    specialize h2 le
+    -- But this means, f M = f N, contradicting the definition of M witnessing instability of f.
+    exact eq <| eq_of_le_of_le le h2
 
+/-- The following alternative proof uses the built-in `WellFounded.wellFounded_iff_has_min`
+    together with the proof above that `ACC` and `WellFounded` are equivalent. The API for
+    WellFounded is quite robust, so it is advantageous to convert to WellFounded whenever
+    possible. -/
+lemma example_2_39' [PartialOrder P] : Order.ACC P ↔
+    ∀ A : Set P, A.Nonempty → ∃ a, Maximal (· ∈ A) a := by
+  rw [←WellFoundedGT_iff_ACC]
+  constructor
+  · intro wf
+    rw [WellFounded.wellFounded_iff_has_min] at wf
+    intro A ne
+    obtain ⟨m, mem, hm⟩ := wf A ne
+    use m
+    use mem
+    intro y hy le
+    specialize hm y hy
+    apply le_of_eq
+    exact eq_iff_le_not_lt.mpr ⟨le, hm⟩|>.symm
+  · rw [WellFounded.wellFounded_iff_has_min]
+    intro max A ne
+    obtain ⟨m, mem, hm⟩ := max A ne
+    use m, mem
+    intro a amem gt
+    specialize hm amem (le_of_lt gt)
+    rw [gt_iff_lt] at gt
+    exact not_lt_of_le hm <| gt
 
+/-- Here is an alternate proof of the forward direction that leverages the
+    result above saying that ACC is incompatible with any function
+    f : A → A such that A ⊆ P and ∀ a, a < f a. -/
+lemma example_2_39a [PartialOrder P] : Order.ACC P →
+    ∀ A : Set P, A.Nonempty → ∃ a, Maximal (· ∈ A) a := by
+  contrapose
+  intro nmax acc
+  push_neg at nmax
+  obtain ⟨A, ⟨p, hp⟩, h⟩ := nmax
+  simp only [Maximal, not_and, not_forall, Classical.not_imp] at h
+  choose g hg using h
+  let f : A → A := λ a ↦ ⟨g a.1 a.2, (hg a.1 a.2).choose⟩
+  apply Order.no_strict_inc_on_of_ACC acc A f ⟨p, hp⟩
+  intro ⟨q, hq⟩
+  simp only [f]
+  obtain ⟨mem, ⟨le, nle⟩⟩ := hg q hq
+  exact lt_of_le_not_le le nle
 
 /-!
   ## 2.40 Theorem
@@ -2136,12 +2316,202 @@ lemma example_2_39 [PartialOrder P] : Order.ACC P ↔
   both ACC and DCC.
 -/
 
-theorem example_2_40 [PartialOrder P] :
-    Order.NoInfiniteChains P ↔ Order.ACC P ∧ Order.DCC P := by
+theorem example_2_40mp [PartialOrder P] :
+    Order.NoInfiniteChains P → Order.ACC P ∧ Order.DCC P := by
+  intro h
   constructor
-  · intro h
+  · intro f
+    by_contra h1
+    push_neg at h1
+    let h2 : ∀ p : Set.range f, ∃ q, p < q := by
+      intro ⟨p, ⟨n, hn⟩⟩
+      obtain ⟨m, hm1, hm2⟩ := h1 n
+      use ⟨f m, by simp⟩
+      simp; rw [←hn]
+      have lt := f.monotone' hm1
+      exact lt_of_le_of_ne lt hm2
+    choose g hg using h2
+    let g' : ℕ → Set.range f := Nat.rec ⟨(f 0), by simp⟩ fun _ ↦ g
+    simp [Order.NoInfiniteChains] at h
+    specialize h (Set.range f)
+    have finf : IsChainLE (Set.range f) := by
+      simp [IsChainLE, IsChain, Pairwise]
+      intro x ⟨n, xmem⟩ y ⟨m, ymem⟩ ne
+      cases Nat.lt_trichotomy n m with
+      | inl h =>
+        apply le_of_lt at h
+        apply f.monotone' at h
+        rw [←xmem, ←ymem]
+        left; assumption
+      | inr h => cases h with
+      | inl h => subst h; rw [xmem] at ymem; contradiction
+      | inr h =>
+        apply le_of_lt at h
+        apply f.monotone' at h
+        rw [←xmem, ←ymem]
+        right; assumption
+    apply h at finf
+    have noMax : NoMaxOrder (Set.range f) := by
+      constructor
+      intro a
+      use ⟨g a, by simp⟩, hg a
+    have inff : Infinite (Set.range f) := NoMaxOrder.infinite
+    exact not_finite ↑(Set.range ⇑f)
+  · intro f
+    by_contra h1
+    push_neg at h1
+    let h2 : ∀ p : Set.range f, ∃ q, p < q := by
+      intro ⟨p, ⟨n, hn⟩⟩
+      obtain ⟨m, hm1, hm2⟩ := h1 n
+      use ⟨f m, by simp⟩
+      simp; rw [←hn]
+      have lt := f.monotone' hm1
+      exact lt_of_le_of_ne lt hm2
+    choose g hg using h2
+    let g' : ℕ → Set.range f := Nat.rec ⟨(f 0), by simp⟩ fun _ ↦ g
+    apply Order.NoInfiniteChains.Dual at h
+    simp [Order.NoInfiniteChains] at h
+    specialize h (Set.range f)
+    have finf : IsChainLE (Set.range f) := by
+      simp [IsChainLE, IsChain, Pairwise]
+      intro x ⟨n, xmem⟩ y ⟨m, ymem⟩ ne
+      cases Nat.lt_trichotomy n m with
+      | inl h =>
+        apply le_of_lt at h
+        apply f.monotone' at h
+        rw [←xmem, ←ymem]
+        left; assumption
+      | inr h => cases h with
+      | inl h => subst h; rw [xmem] at ymem; contradiction
+      | inr h =>
+        apply le_of_lt at h
+        apply f.monotone' at h
+        rw [←xmem, ←ymem]
+        right; assumption
+    apply h at finf
+    have noMax : NoMaxOrder (Set.range f) := by
+      constructor
+      intro a
+      use ⟨g a, by simp⟩, hg a
+    have inff : Infinite (Set.range f) := NoMaxOrder.infinite
+    exact not_finite ↑(Set.range ⇑f)
+
+
+/-- What a beast to prove! I have a feeling there is a 2-3 liner available if I use
+    use stuff from Mathlib. There may even be a way to shorten this argument. But
+    this is the general structure of the proof in the book. -/
+theorem example_2_40mpr [PartialOrder P] :
+    Order.ACC P ∧ Order.DCC P → Order.NoInfiniteChains P := by
+  intro ⟨acc, dcc⟩
+  intro Q hQ
+  by_contra infQ; simp [Finite] at infQ
+  have neQ : Q.Nonempty := Set.Nonempty.of_subtype
+
+  -- We proceed by finding a max x₀ of Q, then a max x₁ of Q \ {x}, etc.
+  -- The idea is that { q ∈ Q | xᵢ ≤ q } will be finite for each of these xᵢ.
+  -- Since { q ∈ Q | q < xᵢ } is the rest of Q, that will be infinite, allowing
+  -- us to use choice to build a decreasing function on Q.
+
+  -- First we show that for any x, Q = { q ∈ Q | q < x ∨ x ≤ q }. Why is this so long?
+  have hAll : ∀ x : Q, Q = { q ∈ Q | q < x } ∪ { q ∈ Q | x ≤ q } := by
+    intro x
+    ext z
     constructor
-    · intro f
-      sorry
-    · sorry
-  · sorry
+    · intro zmem
+      simp [IsChainLE, IsChain] at hQ
+      specialize hQ x.2 zmem
+      by_cases eq : x = z
+      · subst eq; simp
+      · specialize hQ eq
+        cases hQ with
+        | inl hq => simp; right; use zmem, hq
+        | inr hq =>
+            simp; left; use zmem; obtain ⟨x, hx⟩ := x; simp at eq ⊢; exact lt_of_le_of_ne hq fun a => eq (id (Eq.symm a))
+    · intro zmem
+      cases zmem with
+      | inl zmem => exact zmem.1
+      | inr zmem => exact zmem.1
+
+  -- This is where we argue that if the upper set of the split is finite, the lower one must be infinite
+  have key : ∀ x : { q ∈ Q | Finite { q' ∈ Q | q ≤ q' } }, Infinite { q ∈ Q | q < x } := by
+    intro ⟨x, xmem, finX⟩
+    rw [Set.infinite_coe_iff] at infQ ⊢
+    rw [Set.finite_coe_iff] at finX
+    by_contra finY
+    rw [Set.not_infinite] at finY
+    specialize hAll ⟨x, xmem⟩
+    have finQ : ({ q ∈ Q | q < x} ∪ { q' ∈ Q | x ≤ q'}).Finite := Set.Finite.union finY finX
+    rw [←hAll] at finQ
+    exact infQ finQ
+
+  -- This is the heart of the proof. By showing that there is always a smaller element of Q, we can
+  -- later use choice to build the decreasing function.
+  have next : ∀ x : { q ∈ Q | Finite { q' ∈ Q | q ≤ q' } }, ∃ y, y < x := by
+    intro x
+    -- We want to take y to be the maximum of Iio x guranteed by 2_39. This step secretly uses
+    -- Infinitude of { q ∈ Q | q < x } to infer it's nonempty. That is, it uses key.
+    obtain ⟨y, ⟨⟨ymem, lt⟩, ymax⟩⟩ := example_2_39.1 acc { q ∈ Q | q < x } Set.Nonempty.of_subtype
+    -- This is the y we want. We are given y ∈ Q, and y < x. So it only remains to show that
+    -- { q ∈ Q | y ≤ q } is finite.
+    refine ⟨⟨y, ymem, ?_⟩, lt⟩
+    -- Since y was maximal below x, the elements above y are either y or also above x.
+    have seq : { q ∈ Q | y ≤ q } = Set.insert y { q ∈ Q | x ≤ q } := by
+      ext p
+      constructor
+      · intro pmem
+        obtain ⟨pmem, lt'⟩ := pmem
+        simp [le_iff_lt_or_eq] at lt'
+        cases lt' with
+        | inl lt' =>
+            simp [Set.insert]
+            right
+            simp [IsChainLE, IsChain] at hQ
+            use pmem
+            specialize hQ x.2.1 pmem
+            by_cases eq : ↑x = p
+            · exact le_of_eq eq
+            · specialize hQ eq
+              cases hQ with
+              | inl hQ => exact hQ
+              | inr hQ =>
+                  have ltpx : p < x := by exact lt_of_le_of_ne hQ fun a => eq (id (Eq.symm a))
+                  specialize ymax ⟨pmem, ltpx⟩ (le_of_lt lt')
+                  exfalso
+                  simp at lt' ymax
+                  exact not_lt_of_le ymax lt'
+        | inr eq => simp [Set.insert]; left; exact eq.symm
+      · intro pmem
+        simp [IsChainLE, IsChain] at hQ ⊢
+        cases pmem with
+        | inl eq => subst eq; use ymem
+        | inr pmem =>
+            use pmem.1
+            exact (le_of_lt lt).trans pmem.2
+    rw [seq]
+    -- Since the set of elements above x is finite,
+    have finX := x.2.2
+    -- So is the set of elements above x together with y.
+    apply Finite.Set.finite_insert
+  -- We can thus build a decreasing function
+  choose g hg using next
+  -- To use the fact that decreasing functions are incompatible with DCC, we need an element
+  -- of the set, which we can get by taking the max according to 2_39.
+  have x := example_2_39.1 acc Q neQ
+  obtain ⟨x, ⟨xmem, hx⟩⟩ := x
+  -- To prove x is in the set, we need to show the set of elements above it is finite.
+  have finX : Finite { q ∈ Q | x ≤ q } := by
+    have sing : { q ∈ Q | x ≤ q } = {x} := by
+      ext a
+      constructor
+      · intro ⟨amem, lt⟩
+        specialize hx amem lt
+        apply eq_of_le_of_le hx at lt
+        simpa
+      · intro amem
+        simp at amem ⊢
+        subst amem
+        use xmem
+    rw [sing]
+    exact Finite.of_subsingleton
+  -- We thus get our contradiction
+  apply Order.no_strict_dec_on_of_DCC dcc { q ∈ Q | Finite { q' ∈ Q | q ≤ q' } } g ⟨x, ⟨xmem, finX⟩⟩ hg

@@ -7,7 +7,7 @@ import Mathlib.Data.Sum.Order
 import Mathlib.Order.Chain
 import Mathlib.Tactic
 
-import Std.Data.List.Lemmas
+--import Std.Data.List.Lemmas
 
 variable {α : Type} {P Q : Type}
 
@@ -20,8 +20,8 @@ def WithTop.untop_le [PartialOrder α] {y : α} (x : WithTop α) : x ≤ some y 
 theorem WithTop.coe_untop_le [PartialOrder α] {y : α} (x : WithTop α) (h : x ≤ some y) :
     ↑(WithTop.untop_le x h) = x := by
   cases x with
-  | some a => simp [untop_le]; rfl
-  | none => exfalso; apply WithTop.not_top_le_coe y h
+  | coe a => simp [untop_le]
+  | top => exfalso; apply WithTop.not_top_le_coe y h
 
 -- Not in Mathlib!?!
 instance instLowerSetHasSubset [Preorder P] : HasSubset (LowerSet P) :=
@@ -31,12 +31,12 @@ instance instLowerSetHasSubset [Preorder P] : HasSubset (LowerSet P) :=
 
 instance instLowerSetHasSSubset [Preorder P] : HasSSubset (LowerSet P) :=
 {
-  SSubset := λ H K ↦ H < K 
+  SSubset := λ H K ↦ H < K
 }
 
 instance instUpperSetHasSSubset [Preorder P] : HasSSubset (UpperSet P) :=
 {
-  SSubset := λ H K ↦ H < K 
+  SSubset := λ H K ↦ H < K
 }
 
 instance instUpperSetHasSubset [Preorder P] : HasSubset (UpperSet P) :=
@@ -51,38 +51,38 @@ instance LowerSet.instEmptyCollection [LE P] : EmptyCollection (LowerSet P) :=
 
 @[simp]
 theorem LowerSet.subset_lift [Preorder P] {S T : LowerSet P} :
-    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl 
+    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl
 
 @[simp]
 theorem LowerSet.ssubset_lift [Preorder P] {S T : LowerSet P} :
-    S ⊂ T ↔ S.carrier ⊂ T.carrier := by rfl 
+    S ⊂ T ↔ S.carrier ⊂ T.carrier := by rfl
 
 @[simp]
 theorem LowerSet.lt_lift [Preorder P] {S T : LowerSet P} :
-    S < T ↔ S.carrier < T.carrier := by rfl 
-    
+    S < T ↔ S.carrier < T.carrier := by rfl
+
 @[simp]
 theorem UpperSet.subset_lift [Preorder P] {S T : UpperSet P} :
-    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl 
+    S ⊆ T ↔ S.carrier ⊆ T.carrier := by rfl
 
-instance instLowerSetUnion [Preorder α] : Union (LowerSet α) := 
+instance instLowerSetUnion [Preorder α] : Union (LowerSet α) :=
   { union := λ s t ↦ ⟨s.carrier ∪ t.carrier, by
       intro x y le mem
-      cases mem with 
-      | inl mem => left; exact s.lower le mem 
-      | inr mem => right; exact t.lower le mem ⟩ 
+      cases mem with
+      | inl mem => left; exact s.lower le mem
+      | inr mem => right; exact t.lower le mem ⟩
   }
 
-instance instUpperSetUnion [Preorder α] : Union (UpperSet α) := 
+instance instUpperSetUnion [Preorder α] : Union (UpperSet α) :=
   { union := λ s t ↦ ⟨s.carrier ∪ t.carrier, by
       intro x y le mem
-      cases mem with 
-      | inl mem => left; exact s.upper le mem 
-      | inr mem => right; exact t.upper le mem ⟩ 
+      cases mem with
+      | inl mem => left; exact s.upper le mem
+      | inr mem => right; exact t.upper le mem ⟩
   }
 
 
-    
+
 theorem LowerSet.emptyCollection_iff [LE P] : (∅ : LowerSet P) = ⟨∅, isLowerSet_empty⟩ := rfl
 
 theorem LowerSet.eq_empty_carrier [Preorder P] (ls : LowerSet P) :
@@ -102,7 +102,7 @@ theorem OrderDual.ext [LE P] (s t : (LowerSet P)ᵒᵈ) (h : OrderDual.toDual s 
 
 attribute [local simp] WithTop.map WithTop.le_none
 
-theorem WithTop.orderIso [PartialOrder P] [PartialOrder Q] (f : P ≃o Q) :
+def WithTop.orderIso [PartialOrder P] [PartialOrder Q] (f : P ≃o Q) :
     WithTop P ≃o WithTop Q :=
   {
   toFun := WithTop.map f.toFun
@@ -110,12 +110,8 @@ theorem WithTop.orderIso [PartialOrder P] [PartialOrder Q] (f : P ≃o Q) :
   left_inv := (Equiv.optionCongr f.toEquiv).left_inv
   right_inv := (Equiv.optionCongr f.toEquiv).right_inv
   map_rel_iff' := @fun a b => by
-    cases' a with a _ <;> cases' b with b _
-    · simp
-    · simp; constructor <;> intro le <;>
-      simp [WithTop.none_eq_top, WithTop.some_eq_coe] at le
-    · simp
-    · simp
+    cases' a with a _ <;> cases' b with b _ <;>
+    · simp [Option.map, WithTop.none_eq_top, WithTop.some_eq_coe]
   }
 
 instance OrderDual.instHasCompl [HasCompl P] [LE P] : HasCompl (Pᵒᵈ) :=
@@ -157,10 +153,11 @@ lemma List.prefix_of_ne_concat {l1 l2 : List α} {a : α} (h : l1 ≠ l2 ++ [a])
     | inr h1 =>
       obtain ⟨L, b, hlb⟩ := h1
       subst u
-      simp
-      rw [←List.append_assoc, ←List.concat_eq_append, ←List.concat_eq_append] at hu
-      apply List.of_concat_eq_concat at hu
-      exact hu.1
+      simp at hu
+      rw [←List.append_assoc] at hu
+      simp only [concat_eq_append, length_append, length_singleton, add_tsub_cancel_right,
+        take_left']
+      exact Eq.symm (append_inj_left' (id (Eq.symm hu)) rfl)
 
 /-- Could this go into Mathlib? -/
 theorem List.prefix_of_eq_append {l1 l2 l3 l4 : List α} (h : l1 ++ l2 = l3 ++ l4) :

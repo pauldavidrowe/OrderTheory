@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Paul D. Rowe
 -/
 import OrderTheory.Chapter01
+import Mathlib.Data.List.Indexes
 
 open scoped Classical
 
@@ -33,10 +34,10 @@ variable {P Q : Type}
 -/
 
 /-- A class defining trees as in the text. -/
-class OrderTree (P : Type) [PartialOrder P] [OrderBot P] : Type where
-  tree' : (∀ x : P, IsChain_le (↓ᵖx).carrier)
+class OrderTree (P : Type _) [PartialOrder P] [OrderBot P] : Type _ where
+  tree' : (∀ x : P, IsChainLE (↓ᵖx).carrier)
 
-lemma exercise_1_5 : OrderTree (List (Fin 2)) :=
+def exercise_1_5 : OrderTree (List (Fin 2)) :=
   {
     tree' := by
       intro l
@@ -129,7 +130,7 @@ lemma le_trans : ∀ a b c : P', a ≤ b → b ≤ c → a ≤ c := by
         obtain ⟨xc, hxc⟩ := h; subst c
         rw [List.append_assoc] at ha'
         apply List.append_cancel_left at ha'
-        rw [List.singleton_append, List.append_eq_cons] at ha'
+        rw [List.singleton_append, List.append_eq_cons_iff] at ha'
         cases ha' with
           | inl ha' => rw [ha'.1]; left; simp
           | inr ha' =>
@@ -151,7 +152,7 @@ lemma le_trans : ∀ a b c : P', a ≤ b → b ≤ c → a ≤ c := by
         rw [List.append_assoc] at hz2
         apply List.append_cancel_left at hz2
         simp at hz2; symm at hz2
-        rw [List.append_eq_cons] at hz2
+        rw [List.append_eq_cons_iff] at hz2
         cases hz2 with
         | inl h =>
           rw [h.1]; right; use x2; constructor
@@ -169,7 +170,7 @@ lemma le_trans : ∀ a b c : P', a ≤ b → b ≤ c → a ≤ c := by
         rw [List.append_assoc] at hz2
         apply List.append_cancel_left at hz2
         simp at hz2
-        rw [List.append_eq_cons] at hz2
+        rw [List.append_eq_cons_iff] at hz2
         cases hz2 with
         | inl h =>
           rw [h.1]; right; use x1; constructor
@@ -220,7 +221,7 @@ lemma le_antisymm : ∀ a b : P', a ≤ b → b ≤ a → a = b := by
         apply List.append_cancel_left at hu
         rw [List.singleton_append] at hv hu
         symm at hv hu
-        rw [List.append_eq_cons] at hv hu
+        rw [List.append_eq_cons_iff] at hv hu
         cases hv with
         | inl hv => cases hu with
           | inl hu => simp_all
@@ -236,7 +237,7 @@ lemma le_antisymm : ∀ a b : P', a ≤ b → b ≤ a → a = b := by
         apply List.append_cancel_left at hv
         apply List.append_cancel_left at hu
         nth_rewrite 2 [List.singleton_append] at hv hu
-        rw [List.append_eq_cons] at hv hu
+        rw [List.append_eq_cons_iff] at hv hu
         cases hv with
         | inl hv => cases hu with
           | inl hu => simp_all
@@ -378,7 +379,7 @@ lemma exercise_1_10b [LinearOrder P] [LinearOrder Q] :
 
 
 lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
-    A ⋖ B ↔ ∃ b ∈ minimals_le (↑A)ᶜ, Set.insert b ↑A = B.carrier := by
+    A ⋖ B ↔ ∃ b, Minimal (· ∉ (↑A)) b ∧ Set.insert b ↑A = B.carrier := by
   constructor <;> intro h
   · obtain ⟨h1, h2⟩ := h
     have h3 := Set.exists_of_ssubset h1
@@ -394,18 +395,19 @@ lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
       · intro z
         apply ymem
         exact z (by right; simp : y ∈ A ∪ ↓ᵖy)
-    have isMin : x ∈ minimals_le (↑A)ᶜ := by
-      by_contra nMin; simp [minimals_le, minimals] at nMin
+    have isMin : Minimal (· ∉ (↑A)) x := by
+      by_contra nMin;
+      simp [Minimal] at nMin
       specialize nMin h4
       obtain ⟨y, hy1, hy2, hy3⟩ := nMin
       have ltB : A ∪ ↓ᵖy < B := by
         constructor
         · intro z mem
-          exact Or.elim mem (λ m ↦ h1.1 m) (λ m ↦ B.lower' (m.trans hy1) h3)
+          exact Or.elim mem (λ m ↦ h1.1 m) (λ m ↦ B.lower' (m.trans hy2) h3)
         · intro zmem
           specialize zmem h3
           exact Or.elim zmem (λ _ ↦ by contradiction) (λ _ ↦ by contradiction)
-      exact h2 (Alt y hy2) ltB
+      exact h2 (Alt y hy1) ltB
     use isMin
     ext z
     constructor <;> intro mem
@@ -429,8 +431,9 @@ lemma exercise_1_12 [PartialOrder P] {A B : 𝒪(P)} :
           | inl sub => contradiction
           | inr sub =>
             simp at sub
-            simp [minimals_le, mem_minimals_iff] at isMin
-            exact neq (isMin.2 h5 sub).symm
+            simp [Minimal] at isMin
+            have := eq_of_le_of_le (isMin.2 h5 sub) sub
+            exact neq this.symm
   · obtain ⟨b, min, eq⟩ := h; simp at eq
     constructor
     · constructor

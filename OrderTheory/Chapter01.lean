@@ -5,6 +5,7 @@ Authors: Paul D. Rowe
 -/
 import OrderTheory.Mathlib.lib
 import Mathlib.Tactic
+import Mathlib.Data.Fintype.Card
 
 open scoped Classical
 /-!
@@ -67,10 +68,10 @@ universe u v
   total orders of n elements with the type `Fin n`. These types naturally inherit a
   total order, so `≤` may be used on them as expected. Lean also has a predicate
   `IsChain : (α → α → Prop) → Set α → Prop` that works on sets instead of types. This
-  takes any relation. For convenience we define it for `≤` and call it `IsChain_le`.
+  takes any relation. For convenience we define it for `≤` and call it `IsChainLE`.
 -/
 
-def IsChain_le [LE P] (s : Set P) : Prop := IsChain LE.le s
+def IsChainLE [LE P] (s : Set P) : Prop := IsChain LE.le s
 
 /-!
   An antichain is an order in which `x ≤ y` if and only if `x = y`. To define a type
@@ -420,13 +421,121 @@ instance Function.Option.instPartialOrder :
   TODO: Prove the finite chain condition.
 -/
 
-/-- Predicate that is true iff there are xᵢ such that x = x₀ ⋖ x₁ ⋖ ... ⋖ xₙ = y -/
-def CovChain [LT P] (x y : P) : ℕ → Prop
-  | 0  => x = y
-  | .succ n =>  ∃ w, x ⋖ w ∧ CovChain w y n
+/-- Predicate that is true iff there are xᵢ such that x = x₀ ⋖ x₁ ⋖ ... ⋖ xₙ = y
+    (Relation.TransGen holds iff there is a finite sequence of applications of the relation
+     between the two arguments. It an inductive predicate with constructors `single` and `tail`.)
+-/
+def CovChain' [LT P] (x y : P) : Prop := Relation.TransGen (· ⋖ ·) x y
 
-lemma covChain_of_fintype [PartialOrder P] [Fintype P] {x y : P} :
-    x < y ↔ ∃ n, CovChain x y n := sorry
+inductive CovChain [LT P] : P → P → Prop where
+| single {x y} : x ⋖ y → CovChain x y
+| tail {x b y} : CovChain x b → b ⋖ y → CovChain x y
+
+@[simp]
+def CovChainN [LT P] (x y : P) : ℕ → Prop
+| 0 => x ⋖ y
+| .succ n => ∃ c, CovChainN x c n ∧ c ⋖ y
+
+
+lemma CovChain_CovChainN [LT P] {x y : P} :
+    CovChain x y ↔ ∃ n, CovChainN x y n := by
+  constructor <;> intro h
+  · induction h with
+    | single cb => use 0; exact cb
+    | tail cc cb ih =>
+        obtain ⟨n, h⟩ := ih
+        use n + 1
+        constructor
+        exact ⟨h, cb⟩
+  · obtain ⟨n, h⟩ := h
+    revert y
+    induction n with
+    | zero => intro y h; exact CovChain.single h
+    | succ n ih =>
+        intro y h
+        obtain ⟨c, hc1, hc2⟩ := h
+        exact CovChain.tail (ih hc1) hc2
+
+
+lemma Fintype.exists_covBy_of_lt [PartialOrder P] [Fintype P] {x y : P} (hy : x < y) :
+    ∃ w, x ⋖ w := by
+  --rw [not_isMax_iff] at h
+  --obtain ⟨y, hy⟩ := h
+  -- Since P is finite, < is well-founded
+  have wf := (Finite.wellFounded_of_trans_of_irrefl (· < ·) (α := P))
+  -- Sets with well-founded relations have minimal members.
+  -- We use a minimal member w of Set.Ioc = { a | x < a ≤ y }
+  use WellFounded.min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩
+  -- This minimal element is a member of the set
+  have ⟨hmem1, hmem2⟩ := (WellFounded.min_mem wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩)
+  -- To show x ⋖ w, we show that
+  constructor
+  -- x < w, since w ∈ { a | x < a ≤ y}
+  · exact hmem1
+  -- there is no c, s.t. x < c < w,
+  · intro c lt nlt
+    -- any such c is in Set.Ioc x y
+    have cmem : c ∈ Set.Ioc x y := ⟨lt, nlt.le.trans hmem2⟩
+    -- but since c < w, this contradicts the minimality of w
+    exact WellFounded.not_lt_min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩ cmem nlt
+
+/-- The following is a verbose reproduction of the same result in Mathlib. -/
+lemma covChain_of_lt [PartialOrder P] [LocallyFiniteOrder P] {x y : P} (h : x < y) : CovChain x y := by
+  -- Ico x y is not empty because x is in there.
+  have nzero : (Finset.Ico x y).Nonempty := by
+    use x; simp; exact h
+  -- Since P is a locally finite order, Ico has a maximal element z
+  obtain ⟨z, z_mem, hz⟩ := (Finset.Ico x y).exists_maximal nzero
+  -- Ico x z must have strictly smaller cardinality than Ico x y
+  have z_card : (Finset.Ico x z).card < (Finset.Ico x y).card := by
+    apply Finset.card_lt_card
+    have h1 : Finset.Ico x z ⊆ Finset.Ico x y := by
+      apply Finset.Ico_subset_Ico
+      · exact le_rfl
+      · exact (Finset.mem_Ico.mp z_mem).2.le
+    apply (Finset.ssubset_iff_of_subset h1).mpr
+    use z, z_mem
+    intro mem2
+    simp at mem2
+  -- Since z is maximal in Ico x y, z ⋖ y
+  have hzy : z ⋖ y := by
+    simp [CovBy]
+    simp at z_mem
+    use z_mem.2
+    intro c hzc hcy
+    refine hz c (Finset.mem_Ico.mpr ⟨?_, hcy⟩) hzc
+    exact z_mem.1.trans (hzc).le
+  -- This is the key infinite descent argument.
+  by_cases hxz : x < z
+  -- if x < z, we can invoke the theorem we're proving on x < z.
+  -- This will eventually terminate because
+  · exact .tail (covChain_of_lt hxz) hzy
+  · simp at z_mem
+    have exz := eq_of_le_of_not_lt z_mem.1 hxz
+    subst exz
+    apply CovChain.single hzy
+termination_by (Finset.Ico x y).card
+
+lemma lt_of_covChain [PartialOrder P] [LocallyFiniteOrder P] {x y : P} :
+    CovChain x y → x < y := by
+  intro h
+  induction h with
+  | single h => exact CovBy.lt h
+  | tail c cb lt => exact lt.trans (CovBy.lt cb)
+
+lemma lt_iff_covChain [PartialOrder P] [Fintype P] {x y : P} :
+    x < y ↔ CovChain x y := by
+  haveI := Fintype.toLocallyFiniteOrder (α := P)
+  exact ⟨covChain_of_lt, lt_of_covChain⟩
+
+  /-
+    How does the math argument go?
+    Suppose there is some n so that x ⋖ x₁ ⋖ ... ⋖ x_{n+1}  = y.
+    Do induction on n.
+    If n = 0, then x ⋖ y, so we must have a lemma that says x < y.
+    Otherwise n > 0, so we get w s.t. x ⋖ w ∧ CovChain w y n. By induction,
+    w < y. Apply transitivity of <.
+  -/
 
 /-!
   ## 1.15 Diagrams
@@ -505,25 +614,27 @@ lemma image_lt_lt_of_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
     (∀ x y, f x ⋖ f y ↔ x ⋖ y) → (∀ x y, f x < f y ↔ x < y) := by
   intro h x y
-  rw [covChain_of_fintype, covChain_of_fintype]
-  constructor <;> intro ⟨n, hn⟩ <;> use n <;> revert x y
-  · induction n with
-    | zero => intro x y hn; exact hf.1 hn
-    | succ k ih =>
-      intro x y ⟨w, hw, covc⟩
-      use (Fintype.bijInv hf w)
-      have winv : w = f (Fintype.bijInv hf w) := by
-        symm; apply Fintype.rightInverse_bijInv hf
-      constructor
-      · rw [winv] at hw
-        exact (h x _).mp hw
-      · apply ih (Fintype.bijInv hf w) y
-        rwa [← winv]
-  · induction n with
-    | zero => intro x y hn; congr
-    | succ k ih =>
-      intro x y ⟨w, hw, covc⟩
-      exact ⟨f w, ⟨(h x w).2 hw, by apply ih w y covc⟩⟩
+  rw [lt_iff_covChain, lt_iff_covChain]
+  constructor
+  · intro ccf
+    generalize hy : f y = fy at ccf
+    induction ccf generalizing y with
+    | single cb =>
+        subst hy
+        apply CovChain.single <| (h x y).1 cb
+    | @tail fc _ cc cb ih =>
+        obtain ⟨c, hc⟩ := hf.2 fc
+        specialize ih c hc
+        apply CovChain.tail ih
+        subst hc
+        subst hy
+        exact (h c y).1 cb
+  · intro cc
+    induction cc with
+    | single hy =>
+        apply CovChain.single <| (h x _).mpr hy
+    | tail cc cb ih =>
+        apply CovChain.tail ih <| (h _ _).mpr cb
 
 lemma image_lt_lt_iff_image_covby_covby [Fintype P] [Fintype Q] [PartialOrder P]
     [PartialOrder Q] [DecidableEq Q] (f : P → Q) (hf : f.Bijective) :
@@ -622,6 +733,8 @@ lemma example_1_20c : ⊥ = 0 := bot_eq_zero
   The order of finite lists has a bottom element, namely the empty list.
   The bottom element of partially defined functions is the constant function
   that always ouputs none. These are not in Lean, so we define them here.
+
+  #Mathlib?
 -/
 
 instance List.instOrderBot : OrderBot (List α) :=
@@ -657,18 +770,16 @@ instance Function.Option.instOrderBot : OrderBot (X → Option Y) :=
   An element x of an order P is maximal if and only if `∀ a : P, x ≤ a → x = a`.
   In fact, Lean uses the equivalent definition `∀ a : P, x ≤ a → a ≤ x`. This
   easily implies the first definition by antisymmetry. We write `IsMax x` to
-  state that x is a maximal element of P.
+  state that x is a maximal element of P. For some subset `S : Set P` we can
+  write `Maximal (· ∈ S) x` to say that `x` is a maximal element such that
+  `x ∈ S`.
 
   The text talks of maximal elements of `Q : Set P`, and uses the notation MaxQ
-  to denote the set of maximal elements of Q. In Lean this is denote by
+  to denote the set of maximal elements of Q. In Lean this is denoted by
   `maximals (· ≤ ·) Q`. The use of `(· ≤ ·)` is required because `maximals` is
   well-defined for arbitrary binary relations.
 
   Of course the dual concepts are written `IsMin x` and `minimals`. -/
-
-  def maximals_le [LE α] : Set α → Set α := maximals (· ≤ ·)
-
-  def minimals_le [LE α] : Set α → Set α := minimals (· ≤ ·)
 
 /-
   For any nonempty finite subset Q of an order Q both `maximals_le Q` and
@@ -893,7 +1004,7 @@ theorem upperClosure_eq_self_iff [PartialOrder P] (Q : Set P) :
 
   When P is finite, every nonempty down-set is expressible as a finite
   union of principal down-sets. As with other facts about finite sets,
-  we omit the proof of this fact (which not given in the text either).
+  we omit the proof of this fact (which is not given in the text either).
 -/
 
 /-!
@@ -905,7 +1016,7 @@ theorem upperClosure_eq_self_iff [PartialOrder P] (Q : Set P) :
   we don't use equality, but rather demonstrate an order-isomorphism.
 -/
 
-theorem LowerSet.IsAntichain [PartialOrder P] {Q : Set P} (h : IsAntichain (· ≤ ·) Q) :
+def LowerSet.IsAntichain [PartialOrder P] {Q : Set P} (h : IsAntichain (· ≤ ·) Q) :
     𝒪(Q) ≃o Set Q :=
   {
     toFun := LowerSet.carrier -- The coersion from LowerSet Q to Set Q
@@ -996,8 +1107,8 @@ theorem LowerSet.mem_of_mem_iff_le [PartialOrder P] {x y : P} :
   already.
 -/
 
-lemma example_1_31a [PartialOrder P] (Q : LowerSet P) : 𝒪ᵈ(P) := LowerSet.compl Q
-lemma example_1_31b [PartialOrder P] (Q : UpperSet P) : 𝒪(P) := UpperSet.compl Q
+def example_1_31a [PartialOrder P] (Q : LowerSet P) : 𝒪ᵈ(P) := LowerSet.compl Q
+def example_1_31b [PartialOrder P] (Q : UpperSet P) : 𝒪(P) := UpperSet.compl Q
 
 /-!
   We have `A ⊆ B` if and only if `Bᶜ ⊆ Aᶜ`.
@@ -1010,7 +1121,7 @@ lemma example_1_31c [PartialOrder P] (A B : Set P) : A ⊆ B ↔ Bᶜ ⊆ Aᶜ :
   It follows that 𝒪(P)ᵒᵈ ≃o 𝒪(Pᵒᵈ).
 -/
 
-theorem LowerSet.dual_orderIso [PartialOrder P] :
+def LowerSet.dual_orderIso [PartialOrder P] :
     𝒪(P)ᵒᵈ ≃o 𝒪(Pᵒᵈ) :=
   {
     toFun := λ s ↦
@@ -1050,15 +1161,15 @@ noncomputable def φ [PartialOrder P] : 𝒪(WithTop P) → WithTop (𝒪(P)) :=
   λ | ⟨s, l⟩ =>
     if ⊤ ∈ s
     then ⊤
-    else some ⟨{ x | some x ∈ s }, by
+    else .some ⟨{ x | ↑x ∈ s }, by
       intro a b le mem
       exact l (WithTop.coe_le_coe.2 le) mem⟩
 
 @[simp]
 def ψ [PartialOrder P] : WithTop (𝒪(P)) → 𝒪(WithTop P) :=
   λ
-  | some s =>
-    ⟨{ some x | x ∈ s }, by
+  | .some s =>
+    ⟨{ ↑x | x ∈ s }, by
       intro c d le ⟨x, hx1, hx2⟩
       subst c
       use (WithTop.untop_le d le)
@@ -1075,19 +1186,20 @@ lemma left_inv [PartialOrder P] :
   intro s; ext x
   simp
   split
-  case a.h.h_1 t u heq
-  · split_ifs at heq with h
+  case a.h.h_1 t u heq =>
+    split_ifs at heq with h
     apply WithTop.coe_injective at heq
     subst u
     constructor <;> intro h1
     · obtain ⟨y, hy1, hy2⟩ := h1
       subst x; exact hy1
     · cases x with
-      | some x1 => use x1; simpa
-      | none => exfalso; exact h h1
-  case a.h.h_2 t heq
-  · split_ifs at heq with h
-    simp; apply s.lower' (WithTop.le_none) h
+      | coe x1 => use x1; simp; use h1
+      | top => exfalso; exact h h1
+  case a.h.h_2 t heq =>
+    split_ifs at heq with h
+    · simp; apply s.lower' le_top h
+    · cases heq
 
 lemma right_inv [PartialOrder P] :
     Function.RightInverse ψ
@@ -1095,26 +1207,19 @@ lemma right_inv [PartialOrder P] :
   intro s; simp
   split_ifs with h
   · split at h
-    case pos.h_1 x t heq
-    · simp at h
-    case pos.h_2 t heq
+    case pos.h_1 x t heq => simp at h
+    case pos.h_2 t heq =>
     · rfl
   · split at h
-    case neg.h_1 y t u
-    · congr; simp
-      ext w; simp
-      constructor <;> intro h1
-      · obtain ⟨w1, hw1, hw2⟩ := h1
-        simp at hw2; subst w; exact hw1
-      · use w
-    case neg.h_2 t heq
-    · simp at h
+    case neg.h_1 y t u =>
+      congr; simp
+    case neg.h_2 t heq => simp at h
 
 lemma aux [PartialOrder P] {a : 𝒪(WithTop P)}
     (h : ⊤ ∈ a) : ∀ x, x ∈ a := by
   intro x; cases x with
-  | some x => apply a.lower' (WithTop.le_none) h
-  | none => exact h
+  | coe x => apply a.lower' le_top h
+  | top => exact h
 
 lemma map_rel_iff [PartialOrder P] {a b : 𝒪(WithTop P)} :
     φ a ≤ φ b ↔ a ≤ b := by
@@ -1123,18 +1228,18 @@ lemma map_rel_iff [PartialOrder P] {a b : 𝒪(WithTop P)} :
   · simp only [le_refl, true_iff]
     intro x _
     exact aux h2 x
-  · simp only [top_le_iff, false_iff]
+  · simp only [top_le_iff, WithTop.coe_ne_top, false_iff]
     intro le
     apply h2 (le h1)
   · simp only [le_top, true_iff]
     intro x _
     exact aux h2 x
-  · rw [WithTop.some_le_some]
+  · rw [WithTop.coe_le_coe]
     constructor <;> intro le
     · intro y mem
       cases y with
-      | some z => exact @le z mem
-      | none => exfalso; exact h1 mem
+      | coe z => exact @le z mem
+      | top => exfalso; exact h1 mem
     · intro y mem
       exact le mem
 
@@ -1155,21 +1260,21 @@ namespace Ch_1_32_ib
 noncomputable def toFun [PartialOrder P] : 𝒪(WithBot P) → WithBot (𝒪(P)) :=
   λ | ⟨s, l⟩ =>
     if ⊥ ∈ s
-    then some ⟨{ x | some x ∈ s }, λ _ _ le mem ↦ l (WithBot.coe_le_coe.2 le) mem⟩
+    then some ⟨{ x | ↑x ∈ s }, λ _ _ le mem ↦ l (WithBot.coe_le_coe.2 le) mem⟩
     else ⊥
 
 @[simp]
 def invFun [PartialOrder P] : WithBot (LowerSet P) → LowerSet (WithBot P) :=
   λ
   | some s =>
-    ⟨{ some x | x ∈ s } ∪ {⊥}, λ c d le mem ↦ by
+    ⟨{ ↑x | x ∈ s } ∪ {⊥}, λ c d le mem ↦ by
       cases mem with
       | inl mem =>
         obtain ⟨x, hx1, hx2⟩ := mem
         subst c
         cases d with
-        | none => right; rw [WithBot.none_eq_bot]; simp
-        | some d =>
+        | bot => right; simp
+        | coe d =>
           left; simp at le ⊢; exact s.lower' le hx1
       | inr mem => right; subst c; rw [←eq_bot_iff] at le; subst d; simp ⟩
   | ⊥ => ⟨∅, by intro _ _ _ _; simp_all⟩
@@ -1179,8 +1284,8 @@ def left_inv [PartialOrder P] :
     (toFun : 𝒪(WithBot P) → WithBot (𝒪(P))) := by
   intro ⟨s', hs⟩; simp; split_ifs with h
   · split
-    case pos.h_1 x t heq
-    · simp_all
+    case pos.h_1 x t heq =>
+      simp_all
       obtain ⟨t', ht⟩ := t
       simp only [LowerSet.mk.injEq] at heq
       subst t'
@@ -1191,15 +1296,15 @@ def left_inv [PartialOrder P] :
         | inr ex => obtain ⟨z, hz1, hz2⟩ := ex; subst y; exact hz1
       · intro mem
         cases y with
-        | none => simp; rw [WithBot.none_eq_bot]
-        | some y => simp; exact mem
-    case pos.h_2 t heq
+        | bot => simp
+        | coe y => simp; exact mem
+    case pos.h_2 t heq =>
     · simp_all
   · split
-    case neg.h_1 x t heq
-    · cases heq
-    case neg.h_2 t _
-    · ext x; simp only [LowerSet.coe_mk, Set.mem_empty_iff_false, false_iff]
+    case neg.h_1 x t heq =>
+      cases heq
+    case neg.h_2 t _ =>
+      ext x; simp only [LowerSet.coe_mk, Set.mem_empty_iff_false, false_iff]
       intro xmem
       exact h (hs (OrderBot.bot_le x) xmem)
 
@@ -1208,20 +1313,16 @@ def right_inv [PartialOrder P] :
     (toFun : 𝒪(WithBot P) → WithBot (𝒪(P))) := by
   intro s; simp; split_ifs with h
   · split at h
-    case pos.h_1 _ t s
-    · congr
+    case pos.h_1 _ t s =>
+      congr
       ext x; simp
-      constructor <;> intro mem
-      · obtain ⟨x1, hx1, hx2⟩ := mem; simp at hx2;
-        subst x; exact hx1
-      · use x
-    case pos.h_2 t s
-    · simp at h
+    case pos.h_2 t s =>
+      simp at h
   · split at h
-    case neg.h_1 _ t s
-    · exfalso; apply h; simp
-    case neg.h_2 t s
-    · rfl
+    case neg.h_1 _ t s =>
+      exfalso; apply h; simp
+    case neg.h_2 t s =>
+      rfl
 
 def map_rel_iff' [PartialOrder P] :
     ∀ {x y : 𝒪(WithBot P)}, toFun x ≤ toFun y ↔ x ≤ y := by
@@ -1231,8 +1332,8 @@ def map_rel_iff' [PartialOrder P] :
     constructor <;> intro le
     · intro a amem
       cases a with
-      | some a' => exact le amem
-      | none => exact h2
+      | coe a' => exact le amem
+      | bot => exact h2
     · intro a amem
       exact le amem
   · simp; intro le; apply h2; exact le h1
@@ -1286,7 +1387,6 @@ theorem left_inv [PartialOrder P₁] [PartialOrder P₂] : Function.LeftInverse 
   · cases x with
     | inl x' => simp; exact mem
     | inr x' => simp; exact mem
-  done
 
 theorem right_inv  [PartialOrder P₁] [PartialOrder P₂] : Function.RightInverse invFun
     (toFun : 𝒪(P₁ ⊕ P₂) → 𝒪(P₁) × 𝒪(P₂)) := by
@@ -1305,7 +1405,7 @@ theorem map_rel_iff' [PartialOrder P₁] [PartialOrder P₂] :
     · intro _ amem; exact le amem
     · intro _ amem; exact le amem
 
-theorem Ch_1_32_ii' [PartialOrder P₁] [PartialOrder P₂] : 𝒪(P₁ ⊕ P₂) ≃o 𝒪(P₁) × 𝒪(P₂) :=
+def Ch_1_32_ii' [PartialOrder P₁] [PartialOrder P₂] : 𝒪(P₁ ⊕ P₂) ≃o 𝒪(P₁) × 𝒪(P₂) :=
   {
     toFun := toFun
     invFun := invFun
@@ -1414,7 +1514,7 @@ lemma example_1_36_1 [PartialOrder P] [PartialOrder Q] [PartialOrder R]
   direct to show `P ≃o' φ(P)` instead of using Lean's `OrderIso`.
 -/
 
-lemma example_1_36_2 [PartialOrder P] [PartialOrder Q] (φ : P ↪o Q) :
+def example_1_36_2 [PartialOrder P] [PartialOrder Q] (φ : P ↪o Q) :
     (Set.univ : Set P) ≃o' { φ p | p : P } :=
   {
     toFun := λ p ↦ ⟨φ.toFun p, by simp⟩
@@ -1458,7 +1558,7 @@ lemma example_1_36_4a [PartialOrder P] [PartialOrder Q] (χ : P ≃o Q) :
   · intro a; apply χ.right_inv
   · intro a; apply χ.left_inv
 
-lemma example_1_36_4b [PartialOrder P] [PartialOrder Q] (φ : P → Q) (ψ : Q → P)
+def example_1_36_4b [PartialOrder P] [PartialOrder Q] (φ : P → Q) (ψ : Q → P)
     (h1 : Monotone φ) (h2 : Monotone ψ) (h3 : Function.LeftInverse ψ φ)
     (h4 : Function.RightInverse ψ φ) : P ≃o Q :=
   {
@@ -1489,7 +1589,7 @@ lemma example_1_36_4b [PartialOrder P] [PartialOrder Q] (φ : P → Q) (ψ : Q �
   -/
 
 instance [PartialOrder S] [Membership P S] : Membership P Sᵒᵈ :=
-  { mem := λ p T ↦ p ∈ OrderDual.ofDual T }
+  { mem := λ T p ↦ p ∈ OrderDual.ofDual T }
 
 @[simp]
 theorem mem_toDual_iff [PartialOrder S] [Membership P S] {p : P} {T : S} :
@@ -1507,7 +1607,8 @@ theorem zero_or_one_of_Fin_2 (x : Fin 2): (x = 0) ∨ (x = 1) := by
     | zero => right; rfl
     | succ d => exfalso; linarith
 
-lemma example_1_37 [PartialOrder P] : (P →o Fin 2) ≃o 𝒪(P)ᵒᵈ :=
+noncomputable
+def example_1_37 [PartialOrder P] : (P →o Fin 2) ≃o 𝒪(P)ᵒᵈ :=
   {
     toFun := λ f ↦ ⟨{ p | f p = 0 }, by
       intro y x le mem
