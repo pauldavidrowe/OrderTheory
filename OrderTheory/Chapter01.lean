@@ -479,6 +479,11 @@ lemma Fintype.exists_covBy_of_lt [PartialOrder P] [Fintype P] {x y : P} (hy : x 
     -- but since c < w, this contradicts the minimality of w
     exact WellFounded.not_lt_min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩ cmem nlt
 
+lemma Fintype.exists_covBy_of_lt' [PartialOrder P] [Fintype P] {x y : P} (hy : x < y) :
+    ∃ w, w ⋖ y := by
+  obtain ⟨w, hw⟩ := @Fintype.exists_covBy_of_lt Pᵒᵈ _ _ (OrderDual.toDual y) (OrderDual.toDual x) hy
+  exact ⟨w, toDual_covBy_toDual_iff.mp hw⟩
+
 /-- The following is a verbose reproduction of the same result in Mathlib. -/
 lemma covChain_of_lt [PartialOrder P] [LocallyFiniteOrder P] {x y : P} (h : x < y) : CovChain x y := by
   -- Ico x y is not empty because x is in there.

@@ -9,6 +9,7 @@ import Mathlib.Order.Ideal
 import Mathlib.Data.Set.Card
 import Mathlib.Order.Height
 import Mathlib.Order.RelClasses
+import Mathlib.Data.Finset.Lattice.Fold
 
 open scoped Classical
 
@@ -67,7 +68,10 @@ theorem isLowerSet_lowerBounds [PartialOrder P] (S : Set P) : IsLowerSet Sˡ :=
 
 /-- This seems to be true essentially by definition in Mathlib -/
 theorem IsLUB_iff [PartialOrder P] (S : Set P) {x : P} :
-    IsLUB S x ↔ x ∈ Sᵘ ∧ ∀ {y}, y ∈ Sᵘ → x ≤ y := by exact Eq.to_iff rfl
+    IsLUB S x ↔ x ∈ Sᵘ ∧ ∀ {y}, y ∈ Sᵘ → x ≤ y := Eq.to_iff rfl
+
+theorem IsGLB_iff [PartialOrder P] (S : Set P) {x : P} :
+    IsGLB S x ↔ x ∈ Sˡ ∧ ∀ {y}, y ∈ Sˡ → y ≤ x := Eq.to_iff rfl
 
 /-!
   The least upper bound of `S` exists if and only if there exists `x : P` such that
@@ -1389,17 +1393,28 @@ lemma example_2_23b [CompleteLattice P] (S T : Set P) :
   Let `P` be a lattice. Then for every finite, nonempty set `F`,
   `sSup F` and `sInf F` are defined.
 
-  I'm not going to formalize this, because it doesn't play nice with
-  the type classes in Mathlib. If I were to do it, I would define
-  a new type class that defines functions `fSup : Finset P → P` and
-  `fInf : Finset P → P`. The value of this is questionable, however.
-  But perhaps I could instead define an instance of `SupSet P` given
-  `[Fintype P]` and `[SupSemilattice P]`? Yeah, that could work.
+  Mathlib already has this in some form. Namely it has `Finset.sup'`
+  and `Finset.inf'`. (The unprimed versions do not require `F` to be
+  nonempty, but do require `[OrderBot P]` and `[OrderTop P]` respectively.)
 
-  `TODO`: define an instance of `SupSet P` from `[SupSemilattice P]`
-  and `[Fintype P]`
+  Oddly, while Mathlib has proofs for the component pieces to say that these
+  are LUB and GLB, there is no result stating it explicitly. So I include it
+  here.
 -/
 
+lemma Finset.sup_isLUB {α : Type} [SemilatticeSup α] [OrderBot α] (F : Finset α) :
+    IsLUB F (sup F id) := ⟨λ x h => id_eq x ▸ le_sup h, λ _ h => Finset.sup_le h⟩
+
+lemma Finset.sup'_isLUB {α : Type} [SemilatticeSup α] {F : Finset α} (ne : F.Nonempty) :
+    IsLUB F (sup' F ne id) := ⟨λ x h => id_eq x ▸ le_sup' id h, λ _ h => Finset.sup'_le ne id h⟩
+
+lemma Finset.inf_isGLB {α : Type} [SemilatticeInf α] [OrderTop α] (F : Finset α) :
+    IsGLB F (inf F id) := ⟨λ x h => id_eq x ▸ inf_le h, λ _ h => Finset.le_inf h⟩
+
+lemma Finset.inf'_isGLB {α : Type} [SemilatticeInf α] {F : Finset α} (ne : F.Nonempty) :
+    IsGLB F (inf' F ne id) := ⟨λ x h => id_eq x ▸ inf'_le id h, λ _ h => Finset.le_inf' ne id h⟩
+
+/-
 class FinSupSet (α : Type*) where
   /-- Supremum of a finite set -/
   fSup : ∀ {F : Finset α}, F.Nonempty → α
@@ -1427,6 +1442,12 @@ lemma IsLUB.cons [SemilatticeSup P] (a : P) {b : P} {s : Finset P} (ha : a ∉ s
   rw [Finset.cons_eq_insert]
   push_cast
   exact IsLUB.insert a hs
+
+
+lemma example_2_24a' [Lattice P] {F : Finset P} (ne : F.Nonempty) :
+    ∃ p : P, IsLUB F p := by
+  use F.sup' ne id
+  exact ⟨λ x h => id_eq x ▸ Finset.le_sup' id h, λ _ h => Finset.sup'_le ne id h⟩
 
 lemma example_2_24a [Lattice P] {F : Finset P} (ne : F.Nonempty) :
     ∃ p : P, IsLUB F p := by
@@ -1459,18 +1480,28 @@ lemma fSup.sup [Lattice P] {F : Finset P} (neF : F.Nonempty) {p : P} :
   intro pmem
   exact ((IsLUB_iff _).mp (example_2_24a neF).choose_spec).1 pmem
 
+lemma fInf.inf [Lattice P] {F : Finset P} (neF : F.Nonempty) {p : P} :
+    p ∈ F → fInf neF ≤ p := by
+  intro pmem
+  exact ((IsGLB_iff _).mp (example_2_24b neF).choose_spec).1 pmem
+
 lemma fSup.isLUB [Lattice P] {F : Finset P} (neF : F.Nonempty) : IsLUB F (fSup neF) :=
   (example_2_24a neF).choose_spec
+
+lemma fInf.isGLB [Lattice P] {F : Finset P} (neF : F.Nonempty) : IsGLB F (fInf neF) :=
+  (example_2_24b neF).choose_spec
 
 lemma fSup.isLUB_of_eq [Lattice P] {F : Finset P} (neF : F.Nonempty)
     {x : P} (eq : x = fSup neF) : IsLUB F x := by subst eq; exact fSup.isLUB neF
 
-lemma useMe [PartialOrder P] {S : Set P} {a b : P} (h1 : IsLUB S a) (h2 : IsLUB S b) : a = b := by
-  obtain le1 := h1.2 h2.1
-  obtain le2 := h2.2 h1.1
-  exact le_antisymm le1 le2
+lemma fInf.isGLB_of_eq [Lattice P] {F : Finset P} (neF : F.Nonempty)
+    {x : P} (eq : x = fInf neF) : IsGLB F x := by subst eq; exact fInf.isGLB neF
+ -/
+lemma IsLUB_uniq [PartialOrder P] {S : Set P} {a b : P} (h1 : IsLUB S a) (h2 : IsLUB S b) : a = b :=
+  le_antisymm (h1.2 h2.1) (h2.2 h1.1)
 
 
+/-
 lemma fSup_singleton [Lattice P] {p : P} (ne : ({p} : Finset P).Nonempty) :
     fSup ne = p := by
   have pmem : p ∈ ({p} : Finset P) := Finset.mem_singleton.mpr rfl
@@ -1478,7 +1509,7 @@ lemma fSup_singleton [Lattice P] {p : P} (ne : ({p} : Finset P).Nonempty) :
   have plub : IsLUB {p} p := isLUB_singleton
   have ple := fSup.sup ne pmem
   simp only [fSup, Finset.coe_singleton]
-  exact useMe lub plub
+  exact IsLUB_uniq lub plub -/
 
 /-!
   ## 2.25 Corollary
@@ -1492,6 +1523,49 @@ lemma fSup_singleton [Lattice P] {p : P} (ne : ({p} : Finset P).Nonempty) :
   and `[Fintype P]`. This might involve altering the above lemmas not
   to rely on `sSup` existing in general.
 -/
+
+instance example_2_25a' [Nonempty P] [SemilatticeInf P] [Fintype P] : OrderBot P where
+  bot := Finset.inf' (Finset.univ : Finset P) Finset.univ_nonempty id
+  bot_le := λ a => Finset.inf'_le id (Finset.mem_univ a)
+
+instance example_2_25b' [Nonempty P] [SemilatticeSup P] [Fintype P] : OrderTop P where
+  top := Finset.sup' (Finset.univ : Finset P) Finset.univ_nonempty id
+  le_top := λ a => Finset.le_sup' id (Finset.mem_univ a)
+
+noncomputable
+instance example_2_25a [Nonempty P] [Lattice P] [Fintype P] : SupSet P where
+  sSup := λ S ↦ if h : S.toFinset.Nonempty then fSup h else fInf Finset.univ_nonempty
+
+
+lemma example_2_25b [Nonempty P] [Lattice P] [Fintype P] (S : Set P) :
+    IsLUB S (sSup S) := by
+  dsimp [sSup]
+  split_ifs with h
+  · have lub := fSup.isLUB h
+    rw [Set.coe_toFinset] at lub
+    exact lub
+  · have e : S = ∅ := by
+      rw [Finset.not_nonempty_iff_eq_empty] at h
+      exact Set.toFinset_eq_empty.mp h
+    subst e
+    simp only [isLUB_empty_iff, IsBot]
+    intro b
+    exact fInf.inf _ (Finset.mem_univ b)
+
+noncomputable
+instance example_2_25c [Nonempty P] [Lattice P] [Fintype P] : CompleteSemilatticeSup P where
+  le_sSup := λ S ↦ example_2_25b S|>.1
+  sSup_le := λ S ↦ example_2_25b S|>.2
+
+noncomputable
+instance instNonemptyFintypeCompleteLattice [Nonempty P] [Lattice P] [Fintype P] : CompleteLattice P :=
+  completeLatticeOfCompleteSemilatticeSup P
+
+/- example [IsEmpty P] : CompleteSemilatticeSup P where
+  sSup := λ S ↦ by
+    have e : S = ∅ := Set.eq_empty_of_isEmpty S
+ -/
+
 
 /-!
   ## 2.26 Definition
@@ -1721,7 +1795,7 @@ def example_2_30 [PartialOrder P]
   every non-empty subset `S` of `P`.
 -/
 
-def example_2_31_i_ii (_ : CompleteLattice P) :
+def example_2_31_i_ii [CompleteLattice P] :
     Π (S : Set P), { x // IsGLB S x } := λ S ↦ ⟨sInf S, isGLB_sInf S⟩
 
 /- lemma example_2_31_i_ii (h : CompleteLattice P) : ∀ S : Set P,
@@ -2674,7 +2748,7 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
   have neB : B.Nonempty := by
     obtain ⟨a, amem⟩ := neA
     use a
-    simp [B]
+    simp only [exists_and_left, Set.mem_setOf_eq, B]
     use {a}
     push_cast
     use (Set.singleton_subset_iff.mpr amem), Finset.singleton_nonempty a
@@ -2687,7 +2761,8 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
     let Fa := F ∪ {a}
     have FaSub : ↑Fa ⊆ A := by
       intro x xmem
-      simp [Fa] at xmem
+      simp only [Finset.coe_union, Finset.coe_singleton, Set.union_singleton, Set.mem_insert_iff,
+        Finset.mem_coe, Fa] at xmem
       cases xmem with
       | inl eq => subst eq; exact amem
       | inr xmem => exact hF1 xmem
@@ -2695,10 +2770,10 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
     have FsubFa : F ⊆ Fa := Finset.subset_union_left
     set x := fSup FaNe with hx
     have xmem : x ∈ B := by
-      simp [B]
+      simp only [exists_and_left, Set.mem_setOf_eq, B]
       exact ⟨Fa, ⟨FaSub, ⟨FaNe, by simp⟩⟩⟩
     have le : m ≤ x := by
-      simp [fSup] at hF2 hx
+      simp only [fSup] at hF2 hx
       exact example_2_22_va' F Fa.toSet FsubFa (fSup.isLUB_of_eq neF hF2)
           (fSup.isLUB_of_eq FaNe hx)
     have meqx : m = x := eq_of_le_of_le le (hm2 xmem le)
@@ -2706,14 +2781,12 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
       rw [meqx]
       apply fSup.sup FaNe
       simp [Fa]
-    rw [←hF2]
-    exact alem
+    exact hF2 ▸ alem
   · intro x xmem
     have xlubF : x ∈ Fᵘ := by exact fun ⦃a⦄ a_1 => xmem (hF1 a_1)
     have mlub : IsLUB F m := by exact fSup.isLUB_of_eq neF hF2
     simp [IsLUB, IsLeast] at mlub
-    rw [←hF2]
-    exact mlub.2 xlubF
+    exact hF2 ▸ mlub.2 xlubF
 
 lemma example_2_41_ii [Lattice P] [OrderBot P] (acc : Order.ACC P) :
     Nonempty (CompleteLattice P) :=
@@ -2872,12 +2945,23 @@ lemma example_2_43_1c {n : ℕ} {x : Fin (n +1)} :
     · exact nbot
     · exact (example_2_43_1a x nbot).2
 
-/- lemma example_2_43_2 [Lattice L] [Finite L] {x : L} :
+lemma example_2_43_2 [Nonempty L] [Lattice L] [Fintype L] {x : L} :
     Order.IsSupIrreducible x ↔ ∃! m, m ⋖ x := by
   constructor
   · intro ⟨nbot, h⟩
     simp [IsBot] at nbot
     obtain ⟨b, hb⟩ := nbot
+    have nebot : ⊥ ≠ x := by
+      intro eq
+      subst eq
+      exact hb bot_le
+    have botle : ⊥ ≤ x := bot_le
+    obtain botlt := lt_of_le_of_ne botle nebot
+    obtain ⟨m, hm⟩ := Fintype.exists_covBy_of_lt' botlt
+    use m, hm
+    intro y cb
+
+
     sorry
   · intro ⟨m, hm1, hm2⟩
     constructor
@@ -2894,4 +2978,3 @@ lemma example_2_43_1c {n : ℕ} {x : Fin (n +1)} :
         have ble : b ≤ a ⊔ b := le_sup_right
         rw [←eq] at ale ble
         sorry
- -/
