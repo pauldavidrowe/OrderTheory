@@ -1402,170 +1402,56 @@ lemma example_2_23b [CompleteLattice P] (S T : Set P) :
   here.
 -/
 
-lemma Finset.sup_isLUB {α : Type} [SemilatticeSup α] [OrderBot α] (F : Finset α) :
+open Finset
+
+lemma example_2_24a {α : Type} [SemilatticeSup α] [OrderBot α] (F : Finset α) :
     IsLUB F (sup F id) := ⟨λ x h => id_eq x ▸ le_sup h, λ _ h => Finset.sup_le h⟩
 
-lemma Finset.sup'_isLUB {α : Type} [SemilatticeSup α] {F : Finset α} (ne : F.Nonempty) :
+lemma example_2_24b {α : Type} [SemilatticeSup α] {F : Finset α} (ne : F.Nonempty) :
     IsLUB F (sup' F ne id) := ⟨λ x h => id_eq x ▸ le_sup' id h, λ _ h => Finset.sup'_le ne id h⟩
 
-lemma Finset.inf_isGLB {α : Type} [SemilatticeInf α] [OrderTop α] (F : Finset α) :
+lemma example_2_24c {α : Type} [SemilatticeInf α] [OrderTop α] (F : Finset α) :
     IsGLB F (inf F id) := ⟨λ x h => id_eq x ▸ inf_le h, λ _ h => Finset.le_inf h⟩
 
-lemma Finset.inf'_isGLB {α : Type} [SemilatticeInf α] {F : Finset α} (ne : F.Nonempty) :
+lemma example_2_24d {α : Type} [SemilatticeInf α] {F : Finset α} (ne : F.Nonempty) :
     IsGLB F (inf' F ne id) := ⟨λ x h => id_eq x ▸ inf'_le id h, λ _ h => Finset.le_inf' ne id h⟩
-
-/-
-class FinSupSet (α : Type*) where
-  /-- Supremum of a finite set -/
-  fSup : ∀ {F : Finset α}, F.Nonempty → α
-open FinSupSet
-
-class FinInfSet (α : Type*) where
-  /-- Infimum of a finite set -/
-  fInf : ∀ {F : Finset α}, F.Nonempty → α
-open FinInfSet
-
-instance FinSupSet.toDual {α : Type*} [FinInfSet α] : FinSupSet αᵒᵈ where
-  fSup := λ neF ↦ OrderDual.toDual (fInf neF)
-
-instance FinInfSet.toDual {α : Type*} [FinSupSet α] : FinInfSet αᵒᵈ where
-  fInf := λ neF ↦ OrderDual.toDual (fSup neF)
-
-instance FinSupSet.ofDual {α : Type*} [FinInfSet αᵒᵈ] : FinSupSet αᵒᵈ where
-  fSup := λ neF ↦ OrderDual.ofDual (fSup neF)
-
-instance FinInfSet.ofDual {α : Type*} [FinSupSet αᵒᵈ] : FinInfSet αᵒᵈ where
-  fInf := λ neF ↦ OrderDual.ofDual (fInf neF)
-
-lemma IsLUB.cons [SemilatticeSup P] (a : P) {b : P} {s : Finset P} (ha : a ∉ s) (hs : IsLUB s b) :
-    IsLUB (Finset.cons a s ha) (a ⊔ b) := by
-  rw [Finset.cons_eq_insert]
-  push_cast
-  exact IsLUB.insert a hs
-
-
-lemma example_2_24a' [Lattice P] {F : Finset P} (ne : F.Nonempty) :
-    ∃ p : P, IsLUB F p := by
-  use F.sup' ne id
-  exact ⟨λ x h => id_eq x ▸ Finset.le_sup' id h, λ _ h => Finset.sup'_le ne id h⟩
-
-lemma example_2_24a [Lattice P] {F : Finset P} (ne : F.Nonempty) :
-    ∃ p : P, IsLUB F p := by
-  induction ne using Finset.Nonempty.cons_induction with
-  | singleton a =>
-      use a
-      simp only [Finset.coe_singleton, IsLUB_iff, upperBounds_singleton,
-        Set.mem_Ici, le_refl, imp_self, implies_true, and_self]
-  | cons a s h hs ih =>
-      obtain ⟨x, hx⟩ := ih
-      use a ⊔ x
-      exact IsLUB.cons a h hx
-
-lemma example_2_24b [Lattice P] {F : Finset P} (ne : F.Nonempty) :
-    ∃ p : P, IsGLB F p := by
-  exact @example_2_24a Pᵒᵈ _ _ ne
-
-/-- These typeclasses seem to be more trouble than they're worth.  -/
-noncomputable
-instance instLatticeFinSupSet [Lattice P] : FinSupSet P where
-  fSup := λ ne ↦ (example_2_24a ne).choose
-
-
-noncomputable
-instance instLatticeFinInfSet [Lattice P] : FinInfSet P where
-  fInf := λ ne ↦ (example_2_24b ne).choose
-
-lemma fSup.sup [Lattice P] {F : Finset P} (neF : F.Nonempty) {p : P} :
-    p ∈ F → p ≤ fSup neF := by
-  intro pmem
-  exact ((IsLUB_iff _).mp (example_2_24a neF).choose_spec).1 pmem
-
-lemma fInf.inf [Lattice P] {F : Finset P} (neF : F.Nonempty) {p : P} :
-    p ∈ F → fInf neF ≤ p := by
-  intro pmem
-  exact ((IsGLB_iff _).mp (example_2_24b neF).choose_spec).1 pmem
-
-lemma fSup.isLUB [Lattice P] {F : Finset P} (neF : F.Nonempty) : IsLUB F (fSup neF) :=
-  (example_2_24a neF).choose_spec
-
-lemma fInf.isGLB [Lattice P] {F : Finset P} (neF : F.Nonempty) : IsGLB F (fInf neF) :=
-  (example_2_24b neF).choose_spec
-
-lemma fSup.isLUB_of_eq [Lattice P] {F : Finset P} (neF : F.Nonempty)
-    {x : P} (eq : x = fSup neF) : IsLUB F x := by subst eq; exact fSup.isLUB neF
-
-lemma fInf.isGLB_of_eq [Lattice P] {F : Finset P} (neF : F.Nonempty)
-    {x : P} (eq : x = fInf neF) : IsGLB F x := by subst eq; exact fInf.isGLB neF
- -/
-lemma IsLUB_uniq [PartialOrder P] {S : Set P} {a b : P} (h1 : IsLUB S a) (h2 : IsLUB S b) : a = b :=
-  le_antisymm (h1.2 h2.1) (h2.2 h1.1)
-
-
-/-
-lemma fSup_singleton [Lattice P] {p : P} (ne : ({p} : Finset P).Nonempty) :
-    fSup ne = p := by
-  have pmem : p ∈ ({p} : Finset P) := Finset.mem_singleton.mpr rfl
-  have lub := (example_2_24a ne).choose_spec; push_cast at lub
-  have plub : IsLUB {p} p := isLUB_singleton
-  have ple := fSup.sup ne pmem
-  simp only [fSup, Finset.coe_singleton]
-  exact IsLUB_uniq lub plub -/
 
 /-!
   ## 2.25 Corollary
 
-  Every finite lattice is complete.
+  The text claims every finit lattice is complete, but we seem to need to assume that
+  the lattice is nonempty. This is because for an empty lattice, the empty set is a
+  legitimate set that needs a sup, however, since the lattice is empty, there is no
+  element to serve as the sup.
 
-  If I had the above formalizations, I could then upgrade them into
-  an instance of a `CompleteLattice`.
-
-  `TODO`: define an instance of `CompleteLattice P` from `[Lattice P]`
-  and `[Fintype P]`. This might involve altering the above lemmas not
-  to rely on `sSup` existing in general.
+  Since every `CompleteSemilatticeSup` is a `CompleteLattice`, we can rely only on
+  `Finset.sup`. To avoid nastiness around using `Finset.sup'`, we first show that
+  any nonempty finite SemilatticeSup is an `OrderBot`. Then we can use `Finset.sup`
+  after coercing to `Finset`.
 -/
 
-instance example_2_25a' [Nonempty P] [SemilatticeInf P] [Fintype P] : OrderBot P where
+instance example_2_25a [Nonempty P] [SemilatticeInf P] [Fintype P] : OrderBot P where
   bot := Finset.inf' (Finset.univ : Finset P) Finset.univ_nonempty id
   bot_le := λ a => Finset.inf'_le id (Finset.mem_univ a)
 
-instance example_2_25b' [Nonempty P] [SemilatticeSup P] [Fintype P] : OrderTop P where
-  top := Finset.sup' (Finset.univ : Finset P) Finset.univ_nonempty id
-  le_top := λ a => Finset.le_sup' id (Finset.mem_univ a)
-
 noncomputable
-instance example_2_25a [Nonempty P] [Lattice P] [Fintype P] : SupSet P where
-  sSup := λ S ↦ if h : S.toFinset.Nonempty then fSup h else fInf Finset.univ_nonempty
+instance example_2_25b [Nonempty P] [Lattice P] [Fintype P] : SupSet P where
+  sSup := λ S ↦ sup S.toFinset id
 
-
-lemma example_2_25b [Nonempty P] [Lattice P] [Fintype P] (S : Set P) :
+lemma example_2_25c [Nonempty P] [Lattice P] [Fintype P] (S : Set P) :
     IsLUB S (sSup S) := by
-  dsimp [sSup]
-  split_ifs with h
-  · have lub := fSup.isLUB h
-    rw [Set.coe_toFinset] at lub
-    exact lub
-  · have e : S = ∅ := by
-      rw [Finset.not_nonempty_iff_eq_empty] at h
-      exact Set.toFinset_eq_empty.mp h
-    subst e
-    simp only [isLUB_empty_iff, IsBot]
-    intro b
-    exact fInf.inf _ (Finset.mem_univ b)
+  have := example_2_24a S.toFinset
+  rw [Set.coe_toFinset] at this
+  exact this
 
 noncomputable
-instance example_2_25c [Nonempty P] [Lattice P] [Fintype P] : CompleteSemilatticeSup P where
-  le_sSup := λ S ↦ example_2_25b S|>.1
-  sSup_le := λ S ↦ example_2_25b S|>.2
+def example_2_25d [Nonempty P] [Lattice P] [Fintype P] : CompleteSemilatticeSup P where
+  le_sSup := λ S ↦ example_2_25c S|>.1
+  sSup_le := λ S ↦ example_2_25c S|>.2
 
 noncomputable
-instance instNonemptyFintypeCompleteLattice [Nonempty P] [Lattice P] [Fintype P] : CompleteLattice P :=
-  completeLatticeOfCompleteSemilatticeSup P
-
-/- example [IsEmpty P] : CompleteSemilatticeSup P where
-  sSup := λ S ↦ by
-    have e : S = ∅ := Set.eq_empty_of_isEmpty S
- -/
-
+def instNonemptyFintypeCompleteLattice [Nonempty P] [Lattice P] [Fintype P] : CompleteLattice P :=
+  @completeLatticeOfCompleteSemilatticeSup P example_2_25d
 
 /-!
   ## 2.26 Definition
@@ -2743,8 +2629,8 @@ theorem example_2_40mpr [PartialOrder P] :
 -/
 
 theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.Nonempty) :
-    ∃ F : Finset P, ∃ neF : F.Nonempty, ↑F ⊆ A ∧ IsLUB A (fSup neF) := by
-  let B := { x | ∃ F : Finset P, ∃ neF : F.Nonempty, ↑F ⊆ A ∧ x = fSup neF}
+    ∃ F : Finset P, ∃ neF : F.Nonempty, ↑F ⊆ A ∧ IsLUB A (sup' F neF id) := by
+  let B := { x | ∃ F : Finset P, ∃ neF : F.Nonempty, ↑F ⊆ A ∧ x = sup' F neF id}
   have neB : B.Nonempty := by
     obtain ⟨a, amem⟩ := neA
     use a
@@ -2752,7 +2638,7 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
     use {a}
     push_cast
     use (Set.singleton_subset_iff.mpr amem), Finset.singleton_nonempty a
-    exact Eq.symm (fSup_singleton (Finset.singleton_nonempty a))
+    exact Eq.symm <| sup'_singleton (id : P → P) (b := a)
   obtain ⟨m, ⟨⟨F, neF, hF1, hF2⟩, hm2⟩⟩ := example_2_39a acc B neB
   use F, neF, hF1
   rw [IsLUB_iff]
@@ -2768,33 +2654,34 @@ theorem example_2_41_i [Lattice P] (acc : Order.ACC P) (A : Set P) (neA : A.None
       | inr xmem => exact hF1 xmem
     have FaNe : Fa.Nonempty := ⟨a, by simp [Fa]⟩
     have FsubFa : F ⊆ Fa := Finset.subset_union_left
-    set x := fSup FaNe with hx
+    set x := sup' Fa FaNe id with hx
     have xmem : x ∈ B := by
       simp only [exists_and_left, Set.mem_setOf_eq, B]
-      exact ⟨Fa, ⟨FaSub, ⟨FaNe, by simp⟩⟩⟩
+      exact ⟨Fa, ⟨FaSub, ⟨FaNe, rfl⟩⟩⟩
     have le : m ≤ x := by
-      simp only [fSup] at hF2 hx
-      exact example_2_22_va' F Fa.toSet FsubFa (fSup.isLUB_of_eq neF hF2)
-          (fSup.isLUB_of_eq FaNe hx)
+      simp only [sup'] at hF2 hx
+      exact example_2_22_va' F Fa.toSet FsubFa (hF2 ▸ example_2_24b neF)
+          (hx ▸ example_2_24b FaNe)
     have meqx : m = x := eq_of_le_of_le le (hm2 xmem le)
     have alem : a ≤ m := by
       rw [meqx]
-      apply fSup.sup FaNe
+      apply le_sup' id
       simp [Fa]
     exact hF2 ▸ alem
   · intro x xmem
     have xlubF : x ∈ Fᵘ := by exact fun ⦃a⦄ a_1 => xmem (hF1 a_1)
-    have mlub : IsLUB F m := by exact fSup.isLUB_of_eq neF hF2
+    have mlub : IsLUB F m := hF2 ▸ example_2_24b neF
     simp [IsLUB, IsLeast] at mlub
     exact hF2 ▸ mlub.2 xlubF
 
+set_option pp.proofs true
 lemma example_2_41_ii [Lattice P] [OrderBot P] (acc : Order.ACC P) :
     Nonempty (CompleteLattice P) :=
   ⟨example_2_31_iii_i (P := Pᵒᵈ)
     (λ S ne ↦
       let neF := example_2_41_i acc S ne|>.choose_spec|>.choose
-      let ⟨_, hF2⟩ := example_2_41_i acc S ne|>.choose_spec|>.choose_spec
-      ⟨fSup neF, hF2⟩)⟩
+      let ⟨_, hF2⟩ := example_2_41_i acc (S : Set P) ne|>.choose_spec|>.choose_spec
+      ⟨OrderDual.toDual (sup' _ neF id), hF2⟩)⟩
 
 /-!
     To show part (iii), the text claims that if `P` has no infinite chains
@@ -2802,7 +2689,7 @@ lemma example_2_41_ii [Lattice P] [OrderBot P] (acc : Order.ACC P) :
  -/
 
 noncomputable
-instance Order.NoInfiniteChains.OrderBot [Lattice P] (ne : Nonempty (Set.univ : Set P)) (h : Order.NoInfiniteChains P) :
+def Order.NoInfiniteChains.OrderBot [Lattice P] (ne : Nonempty (Set.univ : Set P)) (h : Order.NoInfiniteChains P) :
     OrderBot P where
   bot := by
     obtain wf := WellFoundedLT_iff_DCC.mpr  <| (example_2_40mp h).2
@@ -2919,7 +2806,7 @@ lemma example_2_43_1a [LinearOrder L] (x : L) (nz : ¬IsBot x) :
 def example_2_43_1b {n : ℕ} : LinearOrder (Order.𝒥 (Fin n)) := by
   infer_instance
 
-instance instFinOrderBot {n : ℕ} : OrderBot (Fin (n + 1)) where
+def instFinOrderBot {n : ℕ} : OrderBot (Fin (n + 1)) where
   bot := ⟨0, by simp only [lt_add_iff_pos_left, add_pos_iff, zero_lt_one, or_true]⟩
   bot_le := by
     intro ⟨k, hk⟩
@@ -2945,36 +2832,58 @@ lemma example_2_43_1c {n : ℕ} {x : Fin (n +1)} :
     · exact nbot
     · exact (example_2_43_1a x nbot).2
 
+lemma example_2_43_2a [SemilatticeSup P] (a b c : P) (h1 : a ⋖ c) (h2 : b ⋖ c) : a = b ∨ a ⊔ b = c := by
+  have sle : a ⊔ b ≤ c := sup_le (CovBy.le h1) (CovBy.le h2)
+  cases CovBy.eq_or_eq h1 le_sup_left sle with
+  | inl supeq =>
+    rw [sup_eq_left, le_iff_eq_or_lt] at supeq
+    cases supeq with
+    | inl eq => left; exact eq.symm
+    | inr lt => exfalso; exact h2.2 lt (h1.1)
+  | inr eq => right; exact eq
+
 lemma example_2_43_2 [Nonempty L] [Lattice L] [Fintype L] {x : L} :
     Order.IsSupIrreducible x ↔ ∃! m, m ⋖ x := by
   constructor
   · intro ⟨nbot, h⟩
     simp [IsBot] at nbot
     obtain ⟨b, hb⟩ := nbot
-    have nebot : ⊥ ≠ x := by
-      intro eq
-      subst eq
-      exact hb bot_le
-    have botle : ⊥ ≤ x := bot_le
-    obtain botlt := lt_of_le_of_ne botle nebot
+    have nebot : ⊥ ≠ x := λ eq ↦ hb <| eq ▸ (bot_le)
+    obtain botlt := lt_of_le_of_ne bot_le nebot
     obtain ⟨m, hm⟩ := Fintype.exists_covBy_of_lt' botlt
     use m, hm
     intro y cb
-
-
-    sorry
+    cases example_2_43_2a m y x hm cb with
+    | inl eq => exact eq.symm
+    | inr eq =>
+      subst eq
+      specialize h m y rfl
+      exfalso
+      cases h with
+      | inl h => exact CovBy.ne hm h.symm
+      | inr h => exact CovBy.ne cb h.symm
   · intro ⟨m, hm1, hm2⟩
     constructor
     · intro bt
-      specialize bt m
-      simp only at hm1 hm2
-      exact not_lt_of_le bt (CovBy.lt hm1)
+      exact not_lt_of_le (bt m) (CovBy.lt hm1)
     · intro a b eq
+      subst eq
       by_cases h : a = b
-      · subst h
-        simp at eq
-        tauto
+      · subst h; simp
       · have ale : a ≤ a ⊔ b := le_sup_left
         have ble : b ≤ a ⊔ b := le_sup_right
-        rw [←eq] at ale ble
-        sorry
+        rw [le_iff_eq_or_lt] at ale ble
+        cases ale with
+        | inl eq => left; exact eq.symm
+        | inr lta =>
+          cases ble with
+          | inl eq => right; exact eq.symm
+          | inr ltb =>
+            exfalso
+            obtain ⟨s, hs1, hs2⟩ := Fintype.exists_covBy_le_of_lt' lta
+            obtain ⟨t, ht1, ht2⟩ := Fintype.exists_covBy_le_of_lt' ltb
+            have hs3 := hm2 s hs1
+            have ht3 := hm2 t ht1
+            subst hs3; subst ht3
+            have tle : a ⊔ b ≤ t := sup_le hs2 ht2
+            exact not_lt_of_le tle (CovBy.lt ht1)

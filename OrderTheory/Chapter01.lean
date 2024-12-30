@@ -417,8 +417,6 @@ instance Function.Option.instPartialOrder :
   While this observation may seem obvious, it is somewhat difficult to formally prove.
   Dealing with finite sets is surprisingly hard in Lean! Since it's used later, it's
   worth stating it here and leaving it unsolved.
-
-  TODO: Prove the finite chain condition.
 -/
 
 /-- Predicate that is true iff there are xᵢ such that x = x₀ ⋖ x₁ ⋖ ... ⋖ xₙ = y
@@ -479,10 +477,28 @@ lemma Fintype.exists_covBy_of_lt [PartialOrder P] [Fintype P] {x y : P} (hy : x 
     -- but since c < w, this contradicts the minimality of w
     exact WellFounded.not_lt_min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩ cmem nlt
 
+lemma Fintype.exists_covBy_le_of_lt [PartialOrder P] [Fintype P] {x y : P} (hy : x < y) :
+    ∃ w, x ⋖ w ∧ w ≤ y := by
+  have wf := (Finite.wellFounded_of_trans_of_irrefl (· < ·) (α := P))
+  use WellFounded.min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩
+  have ⟨hmem1, hmem2⟩ := (WellFounded.min_mem wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩)
+  constructor
+  · constructor
+    · exact hmem1
+    · intro c lt nlt
+      have cmem : c ∈ Set.Ioc x y := ⟨lt, nlt.le.trans hmem2⟩
+      exact WellFounded.not_lt_min wf (Set.Ioc x y) ⟨y, hy, rfl.le⟩ cmem nlt
+  · exact hmem2
+
 lemma Fintype.exists_covBy_of_lt' [PartialOrder P] [Fintype P] {x y : P} (hy : x < y) :
     ∃ w, w ⋖ y := by
   obtain ⟨w, hw⟩ := @Fintype.exists_covBy_of_lt Pᵒᵈ _ _ (OrderDual.toDual y) (OrderDual.toDual x) hy
   exact ⟨w, toDual_covBy_toDual_iff.mp hw⟩
+
+lemma Fintype.exists_covBy_le_of_lt' [PartialOrder P] [Fintype P] {x y : P} (hy : x < y) :
+    ∃ w, w ⋖ y ∧ x ≤ w := by
+  obtain ⟨w, hw, hw'⟩ := @Fintype.exists_covBy_le_of_lt Pᵒᵈ _ _ (OrderDual.toDual y) (OrderDual.toDual x) hy
+  exact ⟨w, toDual_covBy_toDual_iff.mp hw, hw'⟩
 
 /-- The following is a verbose reproduction of the same result in Mathlib. -/
 lemma covChain_of_lt [PartialOrder P] [LocallyFiniteOrder P] {x y : P} (h : x < y) : CovChain x y := by
